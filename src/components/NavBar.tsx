@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { SignOutButton } from "@/components/SignOutButton";
 
 const links = [
   { href: "/dashboard", label: "Overview" },
@@ -52,6 +53,10 @@ export function NavBar() {
           >
             ▸ Present
           </Link>
+          <Link href="/projects" className="nav-link">
+            Projects
+          </Link>
+          <SignOutButton className="nav-link" />
         </nav>
       </div>
     </header>

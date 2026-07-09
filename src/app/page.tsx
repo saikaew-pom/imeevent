@@ -1,12 +1,6 @@
-"use client";
-
-import { useState } from "react";
-import { PasscodeModal } from "@/components/PasscodeModal";
-
-const ink = "#37352F";
-const sub = "#787774";
-const border = "rgba(55,53,47,0.09)";
-const hoverBg = "rgba(55,53,47,0.04)";
+import Link from "next/link";
+import { ink, sub, border, hoverBg } from "@/lib/notionTheme";
+import { ProjectPasscodeCard } from "@/components/ProjectPasscodeCard";
 
 function Icon({ path, size = 18 }: { path: string; size?: number }) {
   return (
@@ -52,8 +46,6 @@ const features = [
 ];
 
 export default function LandingPage() {
-  const [gateOpen, setGateOpen] = useState(false);
-
   return (
     <div
       className="min-h-screen flex flex-col font-sans"
@@ -73,9 +65,13 @@ export default function LandingPage() {
               EventFlow Production
             </span>
           </div>
-          <span className="text-[12px]" style={{ color: sub }}>
-            Production Suite
-          </span>
+          <Link
+            href="/login"
+            className="text-[13px] font-medium px-3.5 py-1.5 rounded-[6px]"
+            style={{ background: ink, color: "#fff" }}
+          >
+            Sign in
+          </Link>
         </div>
       </header>
 
@@ -126,55 +122,20 @@ export default function LandingPage() {
         <div style={{ borderTop: `1px solid ${border}` }} />
       </div>
 
-      {/* Projects — private, no preview */}
+      {/* Projects — private, no preview, sign-in required */}
       <section className="mx-auto max-w-[880px] px-6 py-12 w-full flex-1">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: sub }}>
-            Your projects
+            Featured project
           </h2>
-          <span className="text-[12px]" style={{ color: sub }}>
-            1 project
-          </span>
         </div>
 
-        <button
-          onClick={() => setGateOpen(true)}
-          className="w-full text-left flex items-center gap-3.5 px-4 py-3.5 rounded-[8px] transition-colors group"
-          style={{ border: `1px solid ${border}` }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = hoverBg)}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-        >
-          <span
-            className="w-9 h-9 rounded-[7px] flex items-center justify-center shrink-0"
-            style={{ background: hoverBg, color: sub }}
-          >
-            <Icon path={ICONS.lock} size={16} />
-          </span>
-          <span className="flex-1 min-w-0">
-            <span className="flex items-center gap-2 flex-wrap">
-              <span className="text-[14.5px] font-semibold" style={{ color: ink }}>
-                JW Gala Garden Night
-              </span>
-              <span
-                className="text-[11px] font-medium px-1.5 py-[1px] rounded-full"
-                style={{ border: `1px solid ${border}`, color: sub }}
-              >
-                Private
-              </span>
-            </span>
-            <span className="block text-[12.5px] mt-0.5" style={{ color: sub }}>
-              JW Marriott Phuket · New Year&apos;s Eve 2026 — enter the project
-              passcode to view
-            </span>
-          </span>
-          <span
-            className="text-[13px] font-medium flex items-center gap-1 shrink-0"
-            style={{ color: ink }}
-          >
-            Enter code
-            <Icon path={ICONS.arrow} size={14} />
-          </span>
-        </button>
+        <ProjectPasscodeCard
+          slug="jw-gala-garden-night"
+          name="JW Gala Garden Night"
+          subtitle="JW Marriott Phuket · New Year's Eve 2026 — enter passcode for instant access"
+          dashboardHref="/dashboard"
+        />
       </section>
 
       <footer
@@ -183,13 +144,6 @@ export default function LandingPage() {
       >
         EventFlow Production — internal event planning &amp; simulation suite.
       </footer>
-
-      {gateOpen && (
-        <PasscodeModal
-          projectName="JW Gala Garden Night"
-          onClose={() => setGateOpen(false)}
-        />
-      )}
     </div>
   );
 }
