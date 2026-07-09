@@ -19,6 +19,8 @@ export default function RevenuePage() {
   const resetFinancials = useDeck((s) => s.resetFinancials);
   const lineup = useDeck((s) => s.lineup);
   const customActs = useDeck((s) => s.customActs);
+  const myRole = useDeck((s) => s.myRole);
+  const canWrite = myRole === "owner" || myRole === "editor";
   const primary = financials.tiers[0];
 
   const showActs = lineupTotals(lineup, customActs).totalCost;
@@ -47,9 +49,11 @@ export default function RevenuePage() {
             .
           </p>
         </div>
-        <button onClick={resetFinancials} className="btn">
-          Reset assumptions
-        </button>
+        {canWrite && (
+          <button onClick={resetFinancials} className="btn">
+            Reset assumptions
+          </button>
+        )}
       </div>
 
       {/* KPI row */}
@@ -75,7 +79,7 @@ export default function RevenuePage() {
                 {pnl.pax} guests · {thb(pnl.totalRevenue)}
               </span>
             </div>
-            <div className="space-y-2">
+            <fieldset disabled={!canWrite} className="space-y-2 border-0 p-0 m-0">
               <div className="grid grid-cols-[1fr_84px_58px_24px] gap-2 text-[10px] uppercase tracking-wide text-[var(--text-faint)] px-1">
                 <span>Package</span>
                 <span className="text-right">Price</span>
@@ -123,7 +127,7 @@ export default function RevenuePage() {
               <p className="text-[11px] text-[var(--text-faint)] pt-1">
                 Add or remove tiers to model your package structure.
               </p>
-            </div>
+            </fieldset>
           </div>
 
           {/* Cost summary by line item (read-only, edit in deep dive) */}
@@ -198,7 +202,7 @@ export default function RevenuePage() {
               What-if · {primary?.name ?? "primary tier"}
             </h3>
             {primary && (
-              <>
+              <fieldset disabled={!canWrite} className="border-0 p-0 m-0">
                 <Slider
                   label={`${primary.name} guests`}
                   min={0}
@@ -216,7 +220,7 @@ export default function RevenuePage() {
                   onChange={(v) => setTier(primary.id, { priceTHB: v })}
                   display={thbShort(primary.priceTHB)}
                 />
-              </>
+              </fieldset>
             )}
             <div className="grid grid-cols-3 gap-2 mt-3">
               <MiniStat label="Cost / guest" value={thb(pnl.costPerGuest)} />

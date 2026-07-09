@@ -164,7 +164,7 @@ export function ActLibrary() {
           <ActCard
             key={a.id}
             act={a}
-            onAdd={(slot) => addAct(slot, a.id)}
+            onAdd={canWrite ? (slot) => addAct(slot, a.id) : undefined}
             onEdit={
               canWrite
                 ? () => {
@@ -206,7 +206,7 @@ function ActCard({
   removeLabel = "✕",
 }: {
   act: Act;
-  onAdd: (slot: Placement) => void;
+  onAdd?: (slot: Placement) => void;
   onEdit?: () => void;
   onRemove?: () => void;
   removeLabel?: string;
@@ -291,7 +291,7 @@ function ActCard({
           )}
         </div>
         {/* add-to-slot buttons — shows only; decor items aren't slotted */}
-        {isShow && (
+        {isShow && onAdd && (
           <div className="flex gap-1 mt-auto">
             {(["welcome", "opening", "mid", "finale"] as Placement[]).map((slot) => {
               const rec = act.placement?.includes(slot);

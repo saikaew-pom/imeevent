@@ -20,6 +20,8 @@ export default function CostingPage() {
   const resetFinancials = useDeck((s) => s.resetFinancials);
   const lineup = useDeck((s) => s.lineup);
   const customActs = useDeck((s) => s.customActs);
+  const myRole = useDeck((s) => s.myRole);
+  const canWrite = myRole === "owner" || myRole === "editor";
 
   const showActs = lineupTotals(lineup, customActs).totalCost;
   const pnl = computePnL(financials, showActs);
@@ -45,9 +47,11 @@ export default function CostingPage() {
           <Link href="/revenue" className="btn">
             ← Summary
           </Link>
-          <button onClick={resetFinancials} className="btn">
-            Reset
-          </button>
+          {canWrite && (
+            <button onClick={resetFinancials} className="btn">
+              Reset
+            </button>
+          )}
         </div>
       </div>
 
@@ -66,7 +70,7 @@ export default function CostingPage() {
 
       <div className="grid lg:grid-cols-[1fr_400px] gap-4 items-start">
         {/* Editors */}
-        <div className="space-y-3">
+        <fieldset disabled={!canWrite} className="space-y-3 border-0 p-0 m-0">
           {/* Package revenue */}
           <section className="panel px-5 py-5">
             <div className="flex items-center justify-between mb-3">
@@ -219,7 +223,7 @@ export default function CostingPage() {
               </section>
             );
           })}
-        </div>
+        </fieldset>
 
         {/* Live results (sticky) */}
         <div className="lg:sticky lg:top-[72px] space-y-3">

@@ -21,8 +21,9 @@ const themeOptions: (ThemeKey | "mixed")[] = [
 ];
 
 export function PresetBar() {
-  const { theme, vibe, numShows, setTheme, setVibe, setNumShows, applySuggestion } =
+  const { theme, vibe, numShows, setTheme, setVibe, setNumShows, applySuggestion, myRole } =
     useDeck();
+  const canWrite = myRole === "owner" || myRole === "editor";
 
   const generate = (
     t = theme,
@@ -91,7 +92,11 @@ export function PresetBar() {
           />
         </label>
 
-        <button className="btn btn-gold w-full" onClick={() => generate()}>
+        <button
+          className="btn btn-gold w-full disabled:opacity-50"
+          onClick={() => generate()}
+          disabled={!canWrite}
+        >
           ✦ Generate lineup
         </button>
       </div>
@@ -104,7 +109,8 @@ export function PresetBar() {
           {signaturePresets.map((p) => (
             <button
               key={p.id}
-              className="btn py-1.5 px-3 text-[12px]"
+              className="btn py-1.5 px-3 text-[12px] disabled:opacity-50"
+              disabled={!canWrite}
               onClick={() => {
                 setTheme(p.theme);
                 setVibe(p.vibe);

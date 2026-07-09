@@ -23,6 +23,8 @@ export function LineupPanel() {
   const removeItem = useDeck((s) => s.removeItem);
   const reorderSlot = useDeck((s) => s.reorderSlot);
   const clearLineup = useDeck((s) => s.clearLineup);
+  const myRole = useDeck((s) => s.myRole);
+  const canWrite = myRole === "owner" || myRole === "editor";
 
   const points = curvePoints(lineup, customActs);
   const warnings = analyzeLineup(lineup, customActs);
@@ -95,7 +97,7 @@ export function LineupPanel() {
           <span className="text-[12px] uppercase tracking-wide text-[var(--text-faint)]">
             The lineup
           </span>
-          {totals.count > 0 && (
+          {totals.count > 0 && canWrite && (
             <button
               onClick={clearLineup}
               className="text-[11px] text-[var(--text-faint)] hover:text-[var(--danger)]"
@@ -151,28 +153,30 @@ export function LineupPanel() {
                               {act.energyLabel} · {act.durationMin}m
                             </div>
                           </div>
-                          <div className="flex items-center gap-0.5 shrink-0">
-                            <button
-                              onClick={() => move(slot, item.uid, -1)}
-                              disabled={idx === 0}
-                              className="w-6 h-6 rounded text-[var(--text-faint)] hover:text-[var(--text)] disabled:opacity-25"
-                            >
-                              ▲
-                            </button>
-                            <button
-                              onClick={() => move(slot, item.uid, 1)}
-                              disabled={idx === items.length - 1}
-                              className="w-6 h-6 rounded text-[var(--text-faint)] hover:text-[var(--text)] disabled:opacity-25"
-                            >
-                              ▼
-                            </button>
-                            <button
-                              onClick={() => removeItem(item.uid)}
-                              className="w-6 h-6 rounded text-[var(--text-faint)] hover:text-[var(--danger)]"
-                            >
-                              ✕
-                            </button>
-                          </div>
+                          {canWrite && (
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              <button
+                                onClick={() => move(slot, item.uid, -1)}
+                                disabled={idx === 0}
+                                className="w-6 h-6 rounded text-[var(--text-faint)] hover:text-[var(--text)] disabled:opacity-25"
+                              >
+                                ▲
+                              </button>
+                              <button
+                                onClick={() => move(slot, item.uid, 1)}
+                                disabled={idx === items.length - 1}
+                                className="w-6 h-6 rounded text-[var(--text-faint)] hover:text-[var(--text)] disabled:opacity-25"
+                              >
+                                ▼
+                              </button>
+                              <button
+                                onClick={() => removeItem(item.uid)}
+                                className="w-6 h-6 rounded text-[var(--text-faint)] hover:text-[var(--danger)]"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          )}
                         </div>
                       );
                     })}

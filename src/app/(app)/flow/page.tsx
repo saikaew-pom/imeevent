@@ -34,6 +34,8 @@ export default function FlowPage() {
   const customActs = useDeck((s) => s.customActs);
   const addProgramBeat = useDeck((s) => s.addProgramBeat);
   const resetProgram = useDeck((s) => s.resetProgram);
+  const myRole = useDeck((s) => s.myRole);
+  const canWrite = myRole === "owner" || myRole === "editor";
 
   const toggle = (id: string) =>
     setExpanded((s) => {
@@ -69,7 +71,7 @@ export default function FlowPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {view === "planner" && (
+          {view === "planner" && canWrite && (
             <button onClick={resetProgram} className="btn py-1.5 px-3 text-[12px]">
               Reset to default
             </button>
@@ -138,7 +140,7 @@ export default function FlowPage() {
         ))}
       </section>
 
-      {view === "planner" && (
+      {view === "planner" && canWrite && (
         <button
           onClick={handleAddProgram}
           className="btn btn-emerald w-full mt-2.5 py-3"
@@ -353,6 +355,8 @@ function BeatDrawer({
   const updateProgramBeat = useDeck((s) => s.updateProgramBeat);
   const removeProgramBeat = useDeck((s) => s.removeProgramBeat);
   const setBeatActs = useDeck((s) => s.setBeatActs);
+  const myRole = useDeck((s) => s.myRole);
+  const canWrite = myRole === "owner" || myRole === "editor";
 
   const [draft, setDraft] = useState(videos[`beat-${beatId}`] ?? "");
   const [addingActId, setAddingActId] = useState("");
@@ -433,7 +437,7 @@ function BeatDrawer({
         )}
 
         {planner ? (
-          <div className="panel-2 px-4 py-4 mb-5 space-y-3">
+          <fieldset disabled={!canWrite} className="panel-2 px-4 py-4 mb-5 space-y-3 border-0">
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">
               Edit details
             </div>
@@ -531,7 +535,7 @@ function BeatDrawer({
                 Save &amp; close
               </button>
             </div>
-          </div>
+          </fieldset>
         ) : (
           <p className="text-[14px] text-[var(--text-dim)] leading-relaxed mb-5">
             {beat.what}
@@ -589,7 +593,7 @@ function BeatDrawer({
                       {a.energyLabel} · {a.type}
                     </div>
                   </div>
-                  {planner && (
+                  {planner && canWrite && (
                     <button
                       onClick={() => removeShow(a.id)}
                       className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-[12px]"
@@ -603,7 +607,7 @@ function BeatDrawer({
               ))}
             </div>
           )}
-          {planner && (
+          {planner && canWrite && (
             <div className="flex gap-2">
               <select
                 value={addingActId}

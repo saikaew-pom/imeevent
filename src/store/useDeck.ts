@@ -19,12 +19,32 @@ export interface LineupItem {
 export type ProjectRole = "owner" | "editor" | "viewer";
 
 const uid = () => Math.random().toString(36).slice(2, 9);
+const isWritable = (role: ProjectRole | null) => role === "owner" || role === "editor";
 
 async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error ?? "Request failed.");
   return data as T;
+}
+
+// Lineup/program/financials are shared project state (D1-backed) but change
+// on every keystroke (cost line inputs, drag reorders, etc), so we push each
+// key to the server on a short debounce instead of one request per edit.
+type StateKey = "lineup" | "program" | "financials";
+const persistTimers: Partial<Record<StateKey, ReturnType<typeof setTimeout>>> = {};
+
+function schedulePersist(slug: string | null, key: StateKey, data: unknown) {
+  if (!slug) return;
+  const timer = persistTimers[key];
+  if (timer) clearTimeout(timer);
+  persistTimers[key] = setTimeout(() => {
+    fetch("/api/builder/state", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug, key, data }),
+    }).catch(() => {});
+  }, 600);
 }
 
 interface DeckState {
@@ -37,6 +57,8 @@ interface DeckState {
   customActs: Act[];
   customActsLoaded: boolean;
   myRole: ProjectRole | null;
+  projectSlug: string | null;
+  sharedStateLoaded: boolean;
   program: Beat[];
 
   setVideo: (key: string, url: string) => void;
@@ -74,6 +96,11 @@ interface DeckState {
   ) => Promise<{ ok: boolean; error?: string }>;
   removeCustomAct: (slug: string, id: string) => Promise<{ ok: boolean; error?: string }>;
 
+  // Lineup/program/financials, likewise D1-backed now. hydrateSharedState
+  // fetches the saved copy (if any) and remembers the slug so every
+  // mutating action below can push its own debounced update.
+  hydrateSharedState: (slug: string) => Promise<void>;
+
   addProgramBeat: () => string;
   updateProgramBeat: (id: string, patch: Partial<Beat>) => void;
   removeProgramBeat: (id: string) => void;
@@ -84,266 +111,365 @@ interface DeckState {
 
 export const useDeck = create<DeckState>()(
   persist(
-    (set, get) => ({
-      lineup: [],
-      theme: "mixed",
-      vibe: "balanced",
-      numShows: 3,
-      financials: { ...defaultFinancials },
-      videos: {},
-      customActs: [],
-      customActsLoaded: false,
-      myRole: null,
-      program: runOfShow.map((b) => ({ ...b })),
+    (set, get) => {
+      const persistLineup = () => schedulePersist(get().projectSlug, "lineup", get().lineup);
+      const persistProgram = () => schedulePersist(get().projectSlug, "program", get().program);
+      const persistFinancials = () =>
+        schedulePersist(get().projectSlug, "financials", get().financials);
 
-      setVideo: (key, url) =>
-        set((s) => ({ videos: { ...s.videos, [key]: url } })),
+      return {
+        lineup: [],
+        theme: "mixed",
+        vibe: "balanced",
+        numShows: 3,
+        financials: { ...defaultFinancials },
+        videos: {},
+        customActs: [],
+        customActsLoaded: false,
+        myRole: null,
+        projectSlug: null,
+        sharedStateLoaded: false,
+        program: runOfShow.map((b) => ({ ...b })),
 
-      addAct: (slot, actId) =>
-        set((s) => ({ lineup: [...s.lineup, { uid: uid(), slot, actId }] })),
+        setVideo: (key, url) => set((s) => ({ videos: { ...s.videos, [key]: url } })),
 
-      removeItem: (id) =>
-        set((s) => ({ lineup: s.lineup.filter((i) => i.uid !== id) })),
+        addAct: (slot, actId) => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => ({ lineup: [...s.lineup, { uid: uid(), slot, actId }] }));
+          persistLineup();
+        },
 
-      reorderSlot: (slot, uids) =>
-        set((s) => {
-          const reordered = uids
-            .map((u) => s.lineup.find((i) => i.uid === u))
-            .filter((i): i is LineupItem => Boolean(i));
-          // Rebuild the full lineup, substituting the reordered items in the
-          // first position where this slot appears; keep other slots in place.
-          const result: LineupItem[] = [];
-          let placed = false;
-          for (const item of s.lineup) {
-            if (item.slot === slot) {
-              if (!placed) {
-                result.push(...reordered);
-                placed = true;
+        removeItem: (id) => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => ({ lineup: s.lineup.filter((i) => i.uid !== id) }));
+          persistLineup();
+        },
+
+        reorderSlot: (slot, uids) => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => {
+            const reordered = uids
+              .map((u) => s.lineup.find((i) => i.uid === u))
+              .filter((i): i is LineupItem => Boolean(i));
+            // Rebuild the full lineup, substituting the reordered items in the
+            // first position where this slot appears; keep other slots in place.
+            const result: LineupItem[] = [];
+            let placed = false;
+            for (const item of s.lineup) {
+              if (item.slot === slot) {
+                if (!placed) {
+                  result.push(...reordered);
+                  placed = true;
+                }
+              } else {
+                result.push(item);
               }
-            } else {
-              result.push(item);
             }
+            if (!placed) result.push(...reordered);
+            return { lineup: result };
+          });
+          persistLineup();
+        },
+
+        clearLineup: () => {
+          if (!isWritable(get().myRole)) return;
+          set({ lineup: [] });
+          persistLineup();
+        },
+
+        applySuggestion: (items) => {
+          if (!isWritable(get().myRole)) return;
+          set({ lineup: items.map((i) => ({ uid: uid(), ...i })) });
+          persistLineup();
+        },
+
+        setTheme: (t) => set({ theme: t }),
+        setVibe: (v) => set({ vibe: v }),
+        setNumShows: (n) => set({ numShows: Math.max(1, Math.min(5, n)) }),
+
+        setTier: (id, patch) => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => ({
+            financials: {
+              ...s.financials,
+              tiers: s.financials.tiers.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+            },
+          }));
+          persistFinancials();
+        },
+
+        addTier: () => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => ({
+            financials: {
+              ...s.financials,
+              tiers: [
+                ...s.financials.tiers,
+                { id: uid(), name: "New tier", priceTHB: 10000, qty: 0 },
+              ],
+            },
+          }));
+          persistFinancials();
+        },
+
+        removeTier: (id) => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => ({
+            financials: {
+              ...s.financials,
+              tiers: s.financials.tiers.filter((t) => t.id !== id),
+            },
+          }));
+          persistFinancials();
+        },
+
+        setCostLine: (id, value) => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => ({
+            financials: {
+              ...s.financials,
+              costLines: s.financials.costLines.map((l) => (l.id === id ? { ...l, value } : l)),
+            },
+          }));
+          persistFinancials();
+        },
+
+        setCostLineLabel: (id, label) => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => ({
+            financials: {
+              ...s.financials,
+              costLines: s.financials.costLines.map((l) => (l.id === id ? { ...l, label } : l)),
+            },
+          }));
+          persistFinancials();
+        },
+
+        addCostLine: (group) => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => ({
+            financials: {
+              ...s.financials,
+              costLines: [
+                ...s.financials.costLines,
+                { id: uid(), group, label: "New item", value: 0 },
+              ],
+            },
+          }));
+          persistFinancials();
+        },
+
+        removeCostLine: (id) => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => ({
+            financials: {
+              ...s.financials,
+              costLines: s.financials.costLines.filter((l) => l.id !== id),
+            },
+          }));
+          persistFinancials();
+        },
+
+        resetFinancials: () => {
+          if (!isWritable(get().myRole)) return;
+          set({
+            financials: {
+              tiers: defaultFinancials.tiers.map((t) => ({ ...t })),
+              costLines: defaultFinancials.costLines.map((l) => ({ ...l })),
+            },
+          });
+          persistFinancials();
+        },
+
+        hydrateCustomActs: async (slug) => {
+          try {
+            const data = await apiJson<{ role: ProjectRole; acts: Act[] }>(
+              `/api/builder/acts?slug=${encodeURIComponent(slug)}`
+            );
+            set({ customActs: data.acts, myRole: data.role, customActsLoaded: true });
+          } catch {
+            set({ customActsLoaded: true });
           }
-          if (!placed) result.push(...reordered);
-          return { lineup: result };
-        }),
+        },
 
-      clearLineup: () => set({ lineup: [] }),
+        addCustomAct: async (slug, input, baseActId) => {
+          try {
+            const data = await apiJson<{ act: Act }>("/api/builder/acts", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug, input, baseActId }),
+            });
+            set((s) => ({
+              customActs: baseActId
+                ? [...s.customActs.filter((a) => a.id !== data.act.id), data.act]
+                : [...s.customActs, data.act],
+            }));
+            return { ok: true };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Failed to add item." };
+          }
+        },
 
-      applySuggestion: (items) =>
-        set({ lineup: items.map((i) => ({ uid: uid(), ...i })) }),
+        updateCustomAct: async (slug, id, input) => {
+          try {
+            await apiJson(`/api/builder/acts/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug, input }),
+            });
+            // Refetch to stay in sync with server-computed fields (energy label etc).
+            await get().hydrateCustomActs(slug);
+            return { ok: true };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Failed to save item." };
+          }
+        },
 
-      setTheme: (t) => set({ theme: t }),
-      setVibe: (v) => set({ vibe: v }),
-      setNumShows: (n) => set({ numShows: Math.max(1, Math.min(5, n)) }),
+        removeCustomAct: async (slug, id) => {
+          try {
+            await apiJson(`/api/builder/acts/${id}`, {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug }),
+            });
+            set((s) => ({
+              customActs: s.customActs.filter((a) => a.id !== id),
+              // Also drop it from any lineup slots and program links so nothing
+              // dangles on a deleted custom act.
+              lineup: s.lineup.filter((i) => i.actId !== id),
+              program: s.program.map((b) => ({
+                ...b,
+                linkedActs: b.linkedActs?.filter((aid) => aid !== id),
+              })),
+            }));
+            persistLineup();
+            persistProgram();
+            return { ok: true };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Failed to remove item." };
+          }
+        },
 
-      setTier: (id, patch) =>
-        set((s) => ({
-          financials: {
-            ...s.financials,
-            tiers: s.financials.tiers.map((t) =>
-              t.id === id ? { ...t, ...patch } : t
-            ),
-          },
-        })),
+        hydrateSharedState: async (slug) => {
+          try {
+            const data = await apiJson<{
+              role: ProjectRole;
+              lineup: LineupItem[] | null;
+              program: Beat[] | null;
+              financials: FinancialAssumptions | null;
+            }>(`/api/builder/state?slug=${encodeURIComponent(slug)}`);
+            set({
+              projectSlug: slug,
+              myRole: data.role,
+              sharedStateLoaded: true,
+              ...(data.lineup !== null ? { lineup: data.lineup } : {}),
+              ...(data.program !== null ? { program: data.program } : {}),
+              ...(data.financials !== null ? { financials: data.financials } : {}),
+            });
+          } catch {
+            set({ projectSlug: slug, sharedStateLoaded: true });
+          }
+        },
 
-      addTier: () =>
-        set((s) => ({
-          financials: {
-            ...s.financials,
-            tiers: [
-              ...s.financials.tiers,
-              { id: uid(), name: "New tier", priceTHB: 10000, qty: 0 },
-            ],
-          },
-        })),
+        addProgramBeat: () => {
+          if (!isWritable(get().myRole)) return "";
+          const id = `custom-${uid()}`;
+          const beat: Beat = {
+            id,
+            time: "00:00",
+            durationMin: 15,
+            segment: "New Program",
+            location: "",
+            energy: 5,
+            what: "",
+            lead: "",
+            linkedActs: [],
+            custom: true,
+          };
+          set((s) => ({ program: [...s.program, beat] }));
+          persistProgram();
+          return id;
+        },
 
-      removeTier: (id) =>
-        set((s) => ({
-          financials: {
-            ...s.financials,
-            tiers: s.financials.tiers.filter((t) => t.id !== id),
-          },
-        })),
-
-      setCostLine: (id, value) =>
-        set((s) => ({
-          financials: {
-            ...s.financials,
-            costLines: s.financials.costLines.map((l) =>
-              l.id === id ? { ...l, value } : l
-            ),
-          },
-        })),
-
-      setCostLineLabel: (id, label) =>
-        set((s) => ({
-          financials: {
-            ...s.financials,
-            costLines: s.financials.costLines.map((l) =>
-              l.id === id ? { ...l, label } : l
-            ),
-          },
-        })),
-
-      addCostLine: (group) =>
-        set((s) => ({
-          financials: {
-            ...s.financials,
-            costLines: [
-              ...s.financials.costLines,
-              { id: uid(), group, label: "New item", value: 0 },
-            ],
-          },
-        })),
-
-      removeCostLine: (id) =>
-        set((s) => ({
-          financials: {
-            ...s.financials,
-            costLines: s.financials.costLines.filter((l) => l.id !== id),
-          },
-        })),
-
-      resetFinancials: () =>
-        set({
-          financials: {
-            tiers: defaultFinancials.tiers.map((t) => ({ ...t })),
-            costLines: defaultFinancials.costLines.map((l) => ({ ...l })),
-          },
-        }),
-
-      hydrateCustomActs: async (slug) => {
-        try {
-          const data = await apiJson<{ role: ProjectRole; acts: Act[] }>(
-            `/api/builder/acts?slug=${encodeURIComponent(slug)}`
-          );
-          set({ customActs: data.acts, myRole: data.role, customActsLoaded: true });
-        } catch {
-          set({ customActsLoaded: true });
-        }
-      },
-
-      addCustomAct: async (slug, input, baseActId) => {
-        try {
-          const data = await apiJson<{ act: Act }>("/api/builder/acts", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ slug, input, baseActId }),
-          });
+        updateProgramBeat: (id, patch) => {
+          if (!isWritable(get().myRole)) return;
           set((s) => ({
-            customActs: baseActId
-              ? [...s.customActs.filter((a) => a.id !== data.act.id), data.act]
-              : [...s.customActs, data.act],
+            program: s.program.map((b) => (b.id === id ? { ...b, ...patch } : b)),
           }));
-          return { ok: true };
-        } catch (e) {
-          return { ok: false, error: e instanceof Error ? e.message : "Failed to add item." };
-        }
-      },
+          persistProgram();
+        },
 
-      updateCustomAct: async (slug, id, input) => {
-        try {
-          await apiJson(`/api/builder/acts/${id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ slug, input }),
-          });
-          // Refetch to stay in sync with server-computed fields (energy label etc).
-          await get().hydrateCustomActs(slug);
-          return { ok: true };
-        } catch (e) {
-          return { ok: false, error: e instanceof Error ? e.message : "Failed to save item." };
-        }
-      },
+        removeProgramBeat: (id) => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => ({ program: s.program.filter((b) => b.id !== id) }));
+          persistProgram();
+        },
 
-      removeCustomAct: async (slug, id) => {
-        try {
-          await apiJson(`/api/builder/acts/${id}`, {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ slug }),
+        reorderProgram: (ids) => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => {
+            const map = new Map(s.program.map((b) => [b.id, b]));
+            const reordered = ids
+              .map((id) => map.get(id))
+              .filter((b): b is Beat => Boolean(b));
+            return { program: reordered };
           });
+          persistProgram();
+        },
+
+        setBeatActs: (id, actIds) => {
+          if (!isWritable(get().myRole)) return;
           set((s) => ({
-            customActs: s.customActs.filter((a) => a.id !== id),
-            // Also drop it from any lineup slots and program links so nothing
-            // dangles on a deleted custom act.
-            lineup: s.lineup.filter((i) => i.actId !== id),
-            program: s.program.map((b) => ({
-              ...b,
-              linkedActs: b.linkedActs?.filter((aid) => aid !== id),
-            })),
+            program: s.program.map((b) => (b.id === id ? { ...b, linkedActs: actIds } : b)),
           }));
-          return { ok: true };
-        } catch (e) {
-          return { ok: false, error: e instanceof Error ? e.message : "Failed to remove item." };
-        }
-      },
+          persistProgram();
+        },
 
-      addProgramBeat: () => {
-        const id = `custom-${uid()}`;
-        const beat: Beat = {
-          id,
-          time: "00:00",
-          durationMin: 15,
-          segment: "New Program",
-          location: "",
-          energy: 5,
-          what: "",
-          lead: "",
-          linkedActs: [],
-          custom: true,
-        };
-        set((s) => ({ program: [...s.program, beat] }));
-        return id;
-      },
-
-      updateProgramBeat: (id, patch) =>
-        set((s) => ({
-          program: s.program.map((b) => (b.id === id ? { ...b, ...patch } : b)),
-        })),
-
-      removeProgramBeat: (id) =>
-        set((s) => ({ program: s.program.filter((b) => b.id !== id) })),
-
-      reorderProgram: (ids) =>
-        set((s) => {
-          const map = new Map(s.program.map((b) => [b.id, b]));
-          const reordered = ids
-            .map((id) => map.get(id))
-            .filter((b): b is Beat => Boolean(b));
-          return { program: reordered };
-        }),
-
-      setBeatActs: (id, actIds) =>
-        set((s) => ({
-          program: s.program.map((b) =>
-            b.id === id ? { ...b, linkedActs: actIds } : b
-          ),
-        })),
-
-      resetProgram: () => set({ program: runOfShow.map((b) => ({ ...b })) }),
-    }),
+        resetProgram: () => {
+          if (!isWritable(get().myRole)) return;
+          set({ program: runOfShow.map((b) => ({ ...b })) });
+          persistProgram();
+        },
+      };
+    },
     {
-      name: "jw-deck-v3",
-      version: 3,
-      // customActs/myRole/customActsLoaded are server-synced (D1), not
-      // persisted locally — they're refetched fresh via hydrateCustomActs().
+      name: "jw-deck-v4",
+      version: 4,
+      // customActs/myRole/etc are server-synced (D1), not persisted locally —
+      // lineup/program/financials are also server-synced as of v4, but kept
+      // out of localStorage too since the server is now the source of truth.
       partialize: (state) => {
-        const { customActs, myRole, customActsLoaded, ...rest } = state;
+        const {
+          customActs,
+          myRole,
+          customActsLoaded,
+          projectSlug,
+          sharedStateLoaded,
+          lineup,
+          program,
+          financials,
+          ...rest
+        } = state;
         void customActs;
         void myRole;
         void customActsLoaded;
+        void projectSlug;
+        void sharedStateLoaded;
+        void lineup;
+        void program;
+        void financials;
         return rest;
       },
       // v1: ensure VVIP tier exists. v2: ensure customActs/program exist for
-      // state persisted before those were added. v3: custom acts moved to D1
-      // (server-synced), so drop any stale locally-persisted copies.
+      // state persisted before those were added. v3: custom acts moved to D1.
+      // v4: lineup/program/financials moved to D1 too — drop any stale
+      // locally-persisted copies (fresh defaults render until hydrated).
       migrate: (persisted, version) => {
         const s = persisted as {
           financials?: { tiers?: PackageTier[] };
           customActs?: Act[];
           program?: Beat[];
+          lineup?: LineupItem[];
         };
         if (
           version < 1 &&
@@ -361,6 +487,11 @@ export const useDeck = create<DeckState>()(
         }
         if (version < 3) {
           delete s.customActs;
+        }
+        if (version < 4) {
+          delete s.program;
+          delete s.lineup;
+          delete s.financials;
         }
         return s as unknown;
       },
