@@ -20,5 +20,11 @@
       "database_name": "imeevent-db",
       "database_id": "4c80040f-8baa-4a86-a14a-07d09b78e762"
     }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "PHOTOS",
+      "bucket_name": "imeevent-photos"
+    }
   ]
 }

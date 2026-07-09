@@ -15,7 +15,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { slug, input } = (await req.json()) as { slug: string; input: NewActInput };
+  const { slug, input, baseActId } = (await req.json()) as {
+    slug: string;
+    input: NewActInput;
+    baseActId?: string;
+  };
   if (!slug || !input) {
     return NextResponse.json({ error: "Missing slug or input." }, { status: 400 });
   }
@@ -26,6 +30,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Viewers can't add items." }, { status: 403 });
   }
 
-  const act = await createCustomAct(access.project.id, access.user.id, input);
+  const act = await createCustomAct(access.project.id, access.user.id, input, baseActId);
   return NextResponse.json({ act });
 }

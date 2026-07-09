@@ -1,20 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { NewActInput } from "@/data/acts";
-import { getProjectAccess, canWrite } from "@/lib/builder/access";
-import {
-  updateCustomAct,
-  deleteCustomAct,
-  getCustomActProjectId,
-} from "@/lib/builder/customActs";
+import { getProjectAccess, canWrite, ProjectAccess } from "@/lib/builder/access";
+import { updateCustomAct, deleteCustomAct, customActExists } from "@/lib/builder/customActs";
 
-async function checkAccess(id: string, slug: string) {
+async function checkAccess(
+  id: string,
+  slug: string
+): Promise<{ access: ProjectAccess } | { error: NextResponse }> {
   const access = await getProjectAccess(slug);
   if (!access) return { error: NextResponse.json({ error: "Not authorized." }, { status: 403 }) };
   if (!canWrite(access.role)) {
     return { error: NextResponse.json({ error: "Viewers can't edit items." }, { status: 403 }) };
   }
-  const projectId = await getCustomActProjectId(id);
-  if (!projectId || projectId !== access.project.id) {
+  const exists = await customActExists(access.project.id, id);
+  if (!exists) {
     return { error: NextResponse.json({ error: "Item not found." }, { status: 404 }) };
   }
   return { access };
@@ -31,9 +30,9 @@ export async function PATCH(
   }
 
   const check = await checkAccess(id, slug);
-  if (check.error) return check.error;
+  if ("error" in check) return check.error;
 
-  await updateCustomAct(id, input);
+  await updateCustomAct(check.access.project.id, id, input);
   return NextResponse.json({ ok: true });
 }
 
@@ -46,8 +45,8 @@ export async function DELETE(
   if (!slug) return NextResponse.json({ error: "Missing slug." }, { status: 400 });
 
   const check = await checkAccess(id, slug);
-  if (check.error) return check.error;
+  if ("error" in check) return check.error;
 
-  await deleteCustomAct(id);
+  await deleteCustomAct(check.access.project.id, id);
   return NextResponse.json({ ok: true });
 }

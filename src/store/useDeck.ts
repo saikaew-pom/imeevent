@@ -62,7 +62,11 @@ interface DeckState {
   // Custom acts / decor now live in D1, scoped per project — these are async
   // and hit the API rather than mutating local state directly.
   hydrateCustomActs: (slug: string) => Promise<void>;
-  addCustomAct: (slug: string, input: NewActInput) => Promise<{ ok: boolean; error?: string }>;
+  addCustomAct: (
+    slug: string,
+    input: NewActInput,
+    baseActId?: string
+  ) => Promise<{ ok: boolean; error?: string }>;
   updateCustomAct: (
     slug: string,
     id: string,
@@ -220,14 +224,18 @@ export const useDeck = create<DeckState>()(
         }
       },
 
-      addCustomAct: async (slug, input) => {
+      addCustomAct: async (slug, input, baseActId) => {
         try {
           const data = await apiJson<{ act: Act }>("/api/builder/acts", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ slug, input }),
+            body: JSON.stringify({ slug, input, baseActId }),
           });
-          set((s) => ({ customActs: [...s.customActs, data.act] }));
+          set((s) => ({
+            customActs: baseActId
+              ? [...s.customActs.filter((a) => a.id !== data.act.id), data.act]
+              : [...s.customActs, data.act],
+          }));
           return { ok: true };
         } catch (e) {
           return { ok: false, error: e instanceof Error ? e.message : "Failed to add item." };

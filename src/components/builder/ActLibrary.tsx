@@ -64,9 +64,13 @@ export function ActLibrary() {
 
   const submitForm = async (input: NewActInput) => {
     setError("");
-    const result = editing
-      ? await updateCustomAct(PROJECT_SLUG, editing.id, input)
-      : await addCustomAct(PROJECT_SLUG, input);
+    // Editing an item that already has its own row (a fresh custom item, or
+    // a built-in act that was already overridden before) -> update in place.
+    // Editing a built-in act for the first time -> create an override row.
+    const result =
+      editing && (editing.custom || editing.overridden)
+        ? await updateCustomAct(PROJECT_SLUG, editing.id, input)
+        : await addCustomAct(PROJECT_SLUG, input, editing?.id);
     if (!result.ok) setError(result.error ?? "Something went wrong.");
     return result;
   };
@@ -162,14 +166,15 @@ export function ActLibrary() {
             act={a}
             onAdd={(slot) => addAct(slot, a.id)}
             onEdit={
-              a.custom && canWrite
+              canWrite
                 ? () => {
                     setEditing(a);
                     setFormOpen(true);
                   }
                 : undefined
             }
-            onRemove={a.custom && canWrite ? () => handleRemove(a.id) : undefined}
+            onRemove={canWrite && (a.custom || a.overridden) ? () => handleRemove(a.id) : undefined}
+            removeLabel={a.overridden ? "↺ reset" : "✕"}
           />
         ))}
         {filtered.length === 0 && (
@@ -198,11 +203,13 @@ function ActCard({
   onAdd,
   onEdit,
   onRemove,
+  removeLabel = "✕",
 }: {
   act: Act;
   onAdd: (slot: Placement) => void;
   onEdit?: () => void;
   onRemove?: () => void;
+  removeLabel?: string;
 }) {
   const isShow = act.kind === "show";
   return (
@@ -225,6 +232,14 @@ function ActCard({
           {!isShow && (
             <span className="chip py-0.5 px-1.5" style={{ fontSize: 9 }}>
               decor
+            </span>
+          )}
+          {act.overridden && (
+            <span
+              className="chip py-0.5 px-1.5"
+              style={{ fontSize: 9, color: "var(--gold-bright)" }}
+            >
+              edited
             </span>
           )}
           {act.requiresDark && (
@@ -254,20 +269,24 @@ function ActCard({
           <span className="text-[10px] text-[var(--text-faint)]">
             {thbShort(act.costTHB)} · {act.durationMin}m
           </span>
-          {act.custom && (
+          {(onEdit || onRemove) && (
             <div className="flex gap-1">
-              <button
-                onClick={onEdit}
-                className="text-[10px] text-[var(--text-faint)] hover:text-[var(--gold-bright)]"
-              >
-                ✎ edit
-              </button>
-              <button
-                onClick={onRemove}
-                className="text-[10px] text-[var(--text-faint)] hover:text-[var(--danger)]"
-              >
-                ✕
-              </button>
+              {onEdit && (
+                <button
+                  onClick={onEdit}
+                  className="text-[10px] text-[var(--text-faint)] hover:text-[var(--gold-bright)]"
+                >
+                  ✎ edit
+                </button>
+              )}
+              {onRemove && (
+                <button
+                  onClick={onRemove}
+                  className="text-[10px] text-[var(--text-faint)] hover:text-[var(--danger)]"
+                >
+                  {removeLabel}
+                </button>
+              )}
             </div>
           )}
         </div>

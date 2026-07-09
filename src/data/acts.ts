@@ -35,6 +35,7 @@ export interface Act {
   photo: string; // primary
   photos: string[]; // gallery
   custom?: boolean; // true if user-added via the builder (not the source catalogue)
+  overridden?: boolean; // true if this is a built-in act patched via the builder
 }
 
 // Shape submitted from the "add new item" form before an id is assigned.
@@ -717,12 +718,20 @@ export const acts: Act[] = catalogRaw.map((a) => ({ ...a, kind: "show" as const 
 export const actById = (id: string) => acts.find((a) => a.id === id);
 
 // Combined lookup across the built-in catalogue and any user-added custom
-// acts/decor items (custom acts should win on id collision, which can't
-// happen in practice since custom ids are prefixed).
+// acts/decor items. `custom` entries flagged `overridden` patch a built-in
+// act with the same id (edits from the builder); everything else is a fresh
+// user-added item, appended after the (possibly patched) catalogue.
 export function findAct(id: string, custom: Act[] = []): Act | undefined {
-  return custom.find((a) => a.id === id) ?? acts.find((a) => a.id === id);
+  const fromCustom = custom.find((a) => a.id === id);
+  if (fromCustom) return fromCustom;
+  return acts.find((a) => a.id === id);
 }
 
 export function allActsList(custom: Act[] = []): Act[] {
-  return [...acts, ...custom];
+  const overrides = new Map(
+    custom.filter((a) => a.overridden).map((a) => [a.id, a])
+  );
+  const fresh = custom.filter((a) => !a.overridden);
+  const merged = acts.map((a) => overrides.get(a.id) ?? a);
+  return [...merged, ...fresh];
 }

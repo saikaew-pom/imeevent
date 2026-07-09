@@ -13,6 +13,7 @@ import {
 
 const ALL_THEMES = Object.keys(THEME_LABELS) as ThemeKey[];
 const ALL_PLACEMENTS = Object.keys(PLACEMENT_LABELS) as Placement[];
+const PROJECT_SLUG = "jw-gala-garden-night";
 
 export function ItemFormModal({
   initial,
@@ -32,6 +33,8 @@ export function ItemFormModal({
   const [durationMin, setDurationMin] = useState(initial?.durationMin ?? 10);
   const [costTHB, setCostTHB] = useState(initial?.costTHB ?? 0);
   const [photo, setPhoto] = useState(initial?.photo ?? "");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState("");
   const [energy, setEnergy] = useState(initial?.energy ?? 5);
   const [placement, setPlacement] = useState<Placement[]>(
     initial?.placement ?? ["mid"]
@@ -39,6 +42,30 @@ export function ItemFormModal({
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const handlePhotoFile = async (file: File) => {
+    setPhotoError("");
+    setUploadingPhoto(true);
+    const previousPhoto = photo;
+    const localPreview = URL.createObjectURL(file);
+    setPhoto(localPreview);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`/api/builder/upload?slug=${encodeURIComponent(PROJECT_SLUG)}`, {
+        method: "POST",
+        body: form,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Upload failed.");
+      setPhoto(data.url as string);
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : "Upload failed.");
+      setPhoto(previousPhoto);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   const toggleTheme = (t: ThemeKey) =>
     setThemes((s) => (s.includes(t) ? s.filter((x) => x !== t) : [...s, t]));
@@ -161,14 +188,37 @@ export function ItemFormModal({
             </Field>
           </div>
 
-          <Field label="Photo URL (optional)">
-            <input
-              type="text"
-              value={photo}
-              onChange={(e) => setPhoto(e.target.value)}
-              placeholder="https://…"
-              className="w-full"
-            />
+          <Field label="Photo">
+            <div className="flex items-center gap-3">
+              {photo && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={photo}
+                  alt=""
+                  className="w-16 h-16 rounded-md object-cover border"
+                  style={{ borderColor: "var(--border)" }}
+                />
+              )}
+              <label className="btn px-3 py-1.5 text-[12.5px] cursor-pointer">
+                {uploadingPhoto ? "Uploading…" : photo ? "Change photo" : "Upload photo"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  disabled={uploadingPhoto}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handlePhotoFile(file);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+            {photoError && (
+              <p className="text-[11px] mt-1" style={{ color: "var(--danger)" }}>
+                {photoError}
+              </p>
+            )}
           </Field>
 
           <Field label="Themes">
@@ -252,10 +302,10 @@ export function ItemFormModal({
           </button>
           <button
             onClick={submit}
-            disabled={saving}
+            disabled={saving || uploadingPhoto}
             className="btn btn-gold px-4 py-2 disabled:opacity-60"
           >
-            {saving ? "Saving…" : initial ? "Save changes" : "Add item"}
+            {saving ? "Saving…" : uploadingPhoto ? "Uploading…" : initial ? "Save changes" : "Add item"}
           </button>
         </div>
       </div>
