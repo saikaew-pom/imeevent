@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { NavBar } from "@/components/NavBar";
+import { CustomActsHydrator } from "@/components/CustomActsHydrator";
 import { getSessionUser } from "@/lib/auth/session";
 import { getProjectBySlug, isProjectMember } from "@/lib/auth/queries";
 
@@ -19,6 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <>
+      <CustomActsHydrator slug={PROJECT_SLUG} />
       <NavBar />
       <main className="flex-1">{children}</main>
     </>

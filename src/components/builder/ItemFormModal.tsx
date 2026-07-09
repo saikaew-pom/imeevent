@@ -21,7 +21,7 @@ export function ItemFormModal({
 }: {
   initial?: Act; // present when editing an existing custom item
   onClose: () => void;
-  onSubmit: (input: NewActInput) => void;
+  onSubmit: (input: NewActInput) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const [kind, setKind] = useState<ItemKind>(initial?.kind ?? "show");
   const [name, setName] = useState(initial?.name ?? "");
@@ -37,14 +37,19 @@ export function ItemFormModal({
     initial?.placement ?? ["mid"]
   );
 
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
   const toggleTheme = (t: ThemeKey) =>
     setThemes((s) => (s.includes(t) ? s.filter((x) => x !== t) : [...s, t]));
   const togglePlacement = (p: Placement) =>
     setPlacement((s) => (s.includes(p) ? s.filter((x) => x !== p) : [...s, p]));
 
-  const submit = () => {
+  const submit = async () => {
     if (!name.trim()) return;
-    onSubmit({
+    setError("");
+    setSaving(true);
+    const result = await onSubmit({
       name,
       type,
       description,
@@ -57,7 +62,9 @@ export function ItemFormModal({
       energy: kind === "show" ? energy : undefined,
       placement: kind === "show" ? placement : undefined,
     });
-    onClose();
+    setSaving(false);
+    if (result.ok) onClose();
+    else setError(result.error ?? "Something went wrong.");
   };
 
   return (
@@ -233,12 +240,22 @@ export function ItemFormModal({
           )}
         </div>
 
+        {error && (
+          <p className="text-[12.5px] mt-3" style={{ color: "var(--danger)" }}>
+            {error}
+          </p>
+        )}
+
         <div className="flex justify-end gap-2 mt-6">
           <button onClick={onClose} className="btn px-4 py-2">
             Cancel
           </button>
-          <button onClick={submit} className="btn btn-gold px-4 py-2">
-            {initial ? "Save changes" : "Add item"}
+          <button
+            onClick={submit}
+            disabled={saving}
+            className="btn btn-gold px-4 py-2 disabled:opacity-60"
+          >
+            {saving ? "Saving…" : initial ? "Save changes" : "Add item"}
           </button>
         </div>
       </div>

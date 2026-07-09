@@ -2,14 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import {
-  Placement,
-  ThemeKey,
-  Act,
-  NewActInput,
-  PLACEHOLDER_PHOTO,
-  energyLabelFor,
-} from "@/data/acts";
+import { Placement, ThemeKey, Act, NewActInput } from "@/data/acts";
 import { VibeLevel } from "@/data/presets";
 import { defaultFinancials, FinancialAssumptions, PackageTier } from "@/data/financials";
 import { CostGroupKey } from "@/data/costStructure";
@@ -21,28 +14,17 @@ export interface LineupItem {
   actId: string;
 }
 
+// Kept local (not imported from the server-only auth/queries module) so the
+// client store never pulls in "server-only" code.
+export type ProjectRole = "owner" | "editor" | "viewer";
+
 const uid = () => Math.random().toString(36).slice(2, 9);
 
-function buildCustomAct(input: NewActInput): Act {
-  const isShow = input.kind === "show";
-  const energy = isShow ? Math.max(1, Math.min(10, input.energy ?? 5)) : undefined;
-  return {
-    id: `custom-${uid()}`,
-    name: input.name.trim() || "Untitled item",
-    type: input.type.trim() || (isShow ? "Custom act" : "Decor / Element"),
-    description: input.description.trim(),
-    kind: input.kind,
-    energy,
-    energyLabel: energy !== undefined ? energyLabelFor(energy) : undefined,
-    placement: isShow ? (input.placement?.length ? input.placement : ["mid"]) : undefined,
-    themes: input.themes.length ? input.themes : ["interactive"],
-    requiresDark: input.requiresDark,
-    durationMin: input.durationMin || 10,
-    costTHB: input.costTHB || 0,
-    photo: input.photo?.trim() || PLACEHOLDER_PHOTO,
-    photos: input.photo?.trim() ? [input.photo.trim()] : [PLACEHOLDER_PHOTO],
-    custom: true,
-  };
+async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, init);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? "Request failed.");
+  return data as T;
 }
 
 interface DeckState {
@@ -53,6 +35,8 @@ interface DeckState {
   financials: FinancialAssumptions;
   videos: Record<string, string>;
   customActs: Act[];
+  customActsLoaded: boolean;
+  myRole: ProjectRole | null;
   program: Beat[];
 
   setVideo: (key: string, url: string) => void;
@@ -75,9 +59,16 @@ interface DeckState {
   removeCostLine: (id: string) => void;
   resetFinancials: () => void;
 
-  addCustomAct: (input: NewActInput) => string;
-  updateCustomAct: (id: string, patch: Partial<Act>) => void;
-  removeCustomAct: (id: string) => void;
+  // Custom acts / decor now live in D1, scoped per project — these are async
+  // and hit the API rather than mutating local state directly.
+  hydrateCustomActs: (slug: string) => Promise<void>;
+  addCustomAct: (slug: string, input: NewActInput) => Promise<{ ok: boolean; error?: string }>;
+  updateCustomAct: (
+    slug: string,
+    id: string,
+    input: NewActInput
+  ) => Promise<{ ok: boolean; error?: string }>;
+  removeCustomAct: (slug: string, id: string) => Promise<{ ok: boolean; error?: string }>;
 
   addProgramBeat: () => string;
   updateProgramBeat: (id: string, patch: Partial<Beat>) => void;
@@ -89,7 +80,7 @@ interface DeckState {
 
 export const useDeck = create<DeckState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       lineup: [],
       theme: "mixed",
       vibe: "balanced",
@@ -97,6 +88,8 @@ export const useDeck = create<DeckState>()(
       financials: { ...defaultFinancials },
       videos: {},
       customActs: [],
+      customActsLoaded: false,
+      myRole: null,
       program: runOfShow.map((b) => ({ ...b })),
 
       setVideo: (key, url) =>
@@ -216,30 +209,68 @@ export const useDeck = create<DeckState>()(
           },
         }),
 
-      addCustomAct: (input) => {
-        const act = buildCustomAct(input);
-        set((s) => ({ customActs: [...s.customActs, act] }));
-        return act.id;
+      hydrateCustomActs: async (slug) => {
+        try {
+          const data = await apiJson<{ role: ProjectRole; acts: Act[] }>(
+            `/api/builder/acts?slug=${encodeURIComponent(slug)}`
+          );
+          set({ customActs: data.acts, myRole: data.role, customActsLoaded: true });
+        } catch {
+          set({ customActsLoaded: true });
+        }
       },
 
-      updateCustomAct: (id, patch) =>
-        set((s) => ({
-          customActs: s.customActs.map((a) =>
-            a.id === id ? { ...a, ...patch } : a
-          ),
-        })),
+      addCustomAct: async (slug, input) => {
+        try {
+          const data = await apiJson<{ act: Act }>("/api/builder/acts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ slug, input }),
+          });
+          set((s) => ({ customActs: [...s.customActs, data.act] }));
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : "Failed to add item." };
+        }
+      },
 
-      removeCustomAct: (id) =>
-        set((s) => ({
-          customActs: s.customActs.filter((a) => a.id !== id),
-          // Also drop it from any lineup slots and program links so nothing
-          // dangles on a deleted custom act.
-          lineup: s.lineup.filter((i) => i.actId !== id),
-          program: s.program.map((b) => ({
-            ...b,
-            linkedActs: b.linkedActs?.filter((aid) => aid !== id),
-          })),
-        })),
+      updateCustomAct: async (slug, id, input) => {
+        try {
+          await apiJson(`/api/builder/acts/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ slug, input }),
+          });
+          // Refetch to stay in sync with server-computed fields (energy label etc).
+          await get().hydrateCustomActs(slug);
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : "Failed to save item." };
+        }
+      },
+
+      removeCustomAct: async (slug, id) => {
+        try {
+          await apiJson(`/api/builder/acts/${id}`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ slug }),
+          });
+          set((s) => ({
+            customActs: s.customActs.filter((a) => a.id !== id),
+            // Also drop it from any lineup slots and program links so nothing
+            // dangles on a deleted custom act.
+            lineup: s.lineup.filter((i) => i.actId !== id),
+            program: s.program.map((b) => ({
+              ...b,
+              linkedActs: b.linkedActs?.filter((aid) => aid !== id),
+            })),
+          }));
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : "Failed to remove item." };
+        }
+      },
 
       addProgramBeat: () => {
         const id = `custom-${uid()}`;
@@ -287,9 +318,19 @@ export const useDeck = create<DeckState>()(
     }),
     {
       name: "jw-deck-v3",
-      version: 2,
+      version: 3,
+      // customActs/myRole/customActsLoaded are server-synced (D1), not
+      // persisted locally — they're refetched fresh via hydrateCustomActs().
+      partialize: (state) => {
+        const { customActs, myRole, customActsLoaded, ...rest } = state;
+        void customActs;
+        void myRole;
+        void customActsLoaded;
+        return rest;
+      },
       // v1: ensure VVIP tier exists. v2: ensure customActs/program exist for
-      // state persisted before those were added, without wiping other edits.
+      // state persisted before those were added. v3: custom acts moved to D1
+      // (server-synced), so drop any stale locally-persisted copies.
       migrate: (persisted, version) => {
         const s = persisted as {
           financials?: { tiers?: PackageTier[] };
@@ -309,6 +350,9 @@ export const useDeck = create<DeckState>()(
         if (version < 2) {
           if (!s.customActs) s.customActs = [];
           if (!s.program) s.program = runOfShow.map((b) => ({ ...b }));
+        }
+        if (version < 3) {
+          delete s.customActs;
         }
         return s as unknown;
       },

@@ -16,6 +16,8 @@ import { EnergyDots } from "@/components/EnergyBadge";
 import { thbShort } from "@/lib/format";
 import { ItemFormModal } from "./ItemFormModal";
 
+const PROJECT_SLUG = "jw-gala-garden-night";
+
 const slotShort: Record<Placement, string> = {
   welcome: "W",
   opening: "O",
@@ -26,9 +28,11 @@ const slotShort: Record<Placement, string> = {
 export function ActLibrary() {
   const addAct = useDeck((s) => s.addAct);
   const customActs = useDeck((s) => s.customActs);
+  const myRole = useDeck((s) => s.myRole);
   const addCustomAct = useDeck((s) => s.addCustomAct);
   const updateCustomAct = useDeck((s) => s.updateCustomAct);
   const removeCustomAct = useDeck((s) => s.removeCustomAct);
+  const canWrite = myRole === "owner" || myRole === "editor";
 
   const [q, setQ] = useState("");
   const [kindTab, setKindTab] = useState<ItemKind | "all">("all");
@@ -36,6 +40,7 @@ export function ActLibrary() {
   const [placeFilter, setPlaceFilter] = useState<Placement | "all">("all");
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Act | null>(null);
+  const [error, setError] = useState("");
 
   const all = useMemo(() => allActsList(customActs), [customActs]);
 
@@ -57,10 +62,19 @@ export function ActLibrary() {
   const themeKeys = Object.keys(THEME_LABELS) as ThemeKey[];
   const placeKeys = Object.keys(PLACEMENT_LABELS) as Placement[];
 
-  const submitForm = (input: NewActInput) => {
-    if (editing) updateCustomAct(editing.id, buildPatch(input));
-    else addCustomAct(input);
-    setEditing(null);
+  const submitForm = async (input: NewActInput) => {
+    setError("");
+    const result = editing
+      ? await updateCustomAct(PROJECT_SLUG, editing.id, input)
+      : await addCustomAct(PROJECT_SLUG, input);
+    if (!result.ok) setError(result.error ?? "Something went wrong.");
+    return result;
+  };
+
+  const handleRemove = async (id: string) => {
+    setError("");
+    const result = await removeCustomAct(PROJECT_SLUG, id);
+    if (!result.ok) setError(result.error ?? "Failed to remove item.");
   };
 
   return (
@@ -83,16 +97,24 @@ export function ActLibrary() {
             </button>
           ))}
         </div>
-        <button
-          onClick={() => {
-            setEditing(null);
-            setFormOpen(true);
-          }}
-          className="btn btn-emerald py-1.5 px-3 text-[12.5px]"
-        >
-          + Add new item
-        </button>
+        {canWrite && (
+          <button
+            onClick={() => {
+              setEditing(null);
+              setFormOpen(true);
+            }}
+            className="btn btn-emerald py-1.5 px-3 text-[12.5px]"
+          >
+            + Add new item
+          </button>
+        )}
       </div>
+
+      {error && (
+        <p className="text-[12.5px] mb-3" style={{ color: "var(--danger)" }}>
+          {error}
+        </p>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -140,14 +162,14 @@ export function ActLibrary() {
             act={a}
             onAdd={(slot) => addAct(slot, a.id)}
             onEdit={
-              a.custom
+              a.custom && canWrite
                 ? () => {
                     setEditing(a);
                     setFormOpen(true);
                   }
                 : undefined
             }
-            onRemove={a.custom ? () => removeCustomAct(a.id) : undefined}
+            onRemove={a.custom && canWrite ? () => handleRemove(a.id) : undefined}
           />
         ))}
         {filtered.length === 0 && (
@@ -169,34 +191,6 @@ export function ActLibrary() {
       )}
     </div>
   );
-}
-
-function buildPatch(input: NewActInput): Partial<Act> {
-  return {
-    name: input.name,
-    type: input.type,
-    description: input.description,
-    kind: input.kind,
-    themes: input.themes,
-    requiresDark: input.requiresDark,
-    durationMin: input.durationMin,
-    costTHB: input.costTHB,
-    photo: input.photo,
-    photos: input.photo ? [input.photo] : undefined,
-    energy: input.kind === "show" ? input.energy : undefined,
-    energyLabel:
-      input.kind === "show" && input.energy !== undefined
-        ? energyLabelLocal(input.energy)
-        : undefined,
-    placement: input.kind === "show" ? input.placement : undefined,
-  };
-}
-
-function energyLabelLocal(n: number) {
-  if (n <= 3) return "Low";
-  if (n <= 5) return "Medium";
-  if (n <= 8) return "High";
-  return "Very High";
 }
 
 function ActCard({
