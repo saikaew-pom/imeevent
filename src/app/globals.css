@@ -1,26 +1,220 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #0a0f0d;
+  --bg-soft: #101815;
+  --panel: #14201b;
+  --panel-2: #1a2a23;
+  --border: #2a3d34;
+  --border-soft: #22332b;
+  --gold: #d9b45a;
+  --gold-bright: #f0cd77;
+  --emerald: #1f9d6b;
+  --emerald-bright: #35c98c;
+  --text: #eef3ef;
+  --text-dim: #9fb3a8;
+  --text-faint: #6c8177;
+  --danger: #e06a5a;
+  --warn: #e0b24a;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-gold: var(--gold);
+  --color-emerald: var(--emerald);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(900px 500px at 15% -5%, rgba(31, 157, 107, 0.14), transparent 60%),
+    radial-gradient(1000px 600px at 95% 0%, rgba(217, 180, 90, 0.1), transparent 55%),
+    var(--bg);
+  min-height: 100vh;
+}
+
+.font-display {
+  font-family: var(--font-display), Georgia, serif;
+}
+
+/* ---- shared primitives ---- */
+.panel {
+  background: linear-gradient(180deg, var(--panel), var(--bg-soft));
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+}
+
+.panel-2 {
+  background: var(--panel-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+}
+
+.gold-text {
+  color: var(--gold-bright);
+}
+.emerald-text {
+  color: var(--emerald-bright);
+}
+
+.gold-gradient {
+  background: linear-gradient(100deg, var(--gold-bright), var(--gold) 40%, #b8923f);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hairline {
+  border-color: var(--border-soft);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn:hover {
+  border-color: var(--gold);
+  color: var(--gold-bright);
+}
+.btn-gold {
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+  color: #201a08;
+  border: none;
+}
+.btn-gold:hover {
+  color: #201a08;
+  filter: brightness(1.06);
+}
+.btn-emerald {
+  background: linear-gradient(180deg, var(--emerald-bright), var(--emerald));
+  color: #04180f;
+  border: none;
+}
+.btn-emerald:hover {
+  color: #04180f;
+  filter: brightness(1.06);
+}
+
+.nav-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  padding: 7px 13px;
+  border-radius: 9px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.nav-link:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+}
+.nav-link.active {
+  color: var(--gold-bright);
+  background: rgba(217, 180, 90, 0.1);
+}
+
+.energy-low {
+  color: #8fb8d9;
+}
+.energy-mid {
+  color: #7fd3a8;
+}
+.energy-high {
+  color: var(--gold-bright);
+}
+.energy-max {
+  color: #f0a05a;
+}
+
+input[type="number"],
+input[type="text"],
+select {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+input[type="range"] {
+  accent-color: var(--gold);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-up {
+  animation: fadeUp 0.35s ease both;
 }
