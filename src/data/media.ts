@@ -1,7 +1,7 @@
 // Project media library — uploaded photos/clips reusable across beats,
 // talent, and shows. Pure data types (no "server-only" imports) so both the
 // client store and server-side query code can share them.
-export type MediaAssetKind = "image" | "video";
+export type MediaAssetKind = "image" | "video" | "audio";
 
 export interface MediaAsset {
   id: string;

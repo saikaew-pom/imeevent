@@ -6,9 +6,11 @@ import { useDeck } from "@/store/useDeck";
 import { MediaAsset, VIDEO_PLACEHOLDER_POSTER } from "@/data/media";
 import { MediaItem } from "@/data/runOfShow";
 
+// Beat galleries only hold photos/videos (tap-to-play), so audio assets never
+// reach this — the library list below excludes them.
 export function assetToMediaItem(asset: MediaAsset): MediaItem {
   return {
-    type: asset.kind,
+    type: asset.kind === "video" ? "video" : "image",
     src: asset.url,
     poster: asset.kind === "video" ? asset.posterUrl ?? VIDEO_PLACEHOLDER_POSTER : undefined,
     label: asset.name,
@@ -26,7 +28,9 @@ export function MediaPicker({
   onClose: () => void;
   onPick: (item: MediaItem, asset: MediaAsset) => void;
 }) {
-  const mediaAssets = useDeck((s) => s.mediaAssets);
+  // Beat galleries only hold photos/videos — audio lives in the Media
+  // Library but isn't pickable here.
+  const mediaAssets = useDeck((s) => s.mediaAssets).filter((a) => a.kind !== "audio");
   const uploadMediaAsset = useDeck((s) => s.uploadMediaAsset);
 
   const [tab, setTab] = useState<Tab>("upload");

@@ -57,9 +57,9 @@ export default function MediaLibraryPage() {
           <div className="chip mb-2">Media Library</div>
           <h1 className="font-display italic text-3xl md:text-4xl gold-gradient">Media</h1>
           <p className="text-[13px] text-[var(--text-dim)] mt-1 max-w-2xl">
-            Every photo and video clip uploaded anywhere in the project lands here, so it
-            can be reused across Event Flow beats, talent references, and shows without
-            re-uploading.
+            Every photo, video clip, and song uploaded anywhere in the project lands here,
+            so it can be reused across Event Flow beats, talent references, and shows
+            without re-uploading.
           </p>
         </div>
         {canWrite && (
@@ -67,7 +67,7 @@ export default function MediaLibraryPage() {
             {busy ? "Uploading…" : "+ Upload"}
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,audio/mpeg"
               className="hidden"
               disabled={busy}
               onChange={(e) => {
@@ -87,7 +87,7 @@ export default function MediaLibraryPage() {
       )}
 
       <div className="flex gap-1 panel-2 p-1 mb-4 w-fit">
-        {(["all", "image", "video"] as const).map((f) => (
+        {(["all", "image", "video", "audio"] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
@@ -98,7 +98,7 @@ export default function MediaLibraryPage() {
                 : {}
             }
           >
-            {f === "all" ? "All" : f === "image" ? "Photos" : "Videos"}
+            {f === "all" ? "All" : f === "image" ? "Photos" : f === "video" ? "Videos" : "Songs"}
           </button>
         ))}
       </div>
@@ -113,20 +113,36 @@ export default function MediaLibraryPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {filtered.map((a) => (
             <div key={a.id} className="panel-2 overflow-hidden">
-              <div className="relative aspect-video">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={a.kind === "video" ? a.posterUrl ?? VIDEO_PLACEHOLDER_POSTER : a.url}
-                  alt={a.name}
-                  loading="lazy"
-                  className="w-full h-full object-cover"
-                />
-                {a.kind === "video" && (
-                  <span className="absolute top-1.5 right-1.5 chip py-0.5 px-1.5" style={{ fontSize: 9 }}>
-                    video
-                  </span>
-                )}
-              </div>
+              {a.kind === "audio" ? (
+                <div
+                  className="relative aspect-video flex flex-col items-center justify-center gap-1.5 px-2"
+                  style={{ background: "var(--bg-soft)" }}
+                >
+                  <span style={{ fontSize: 22 }}>🎵</span>
+                  <audio
+                    src={a.url}
+                    controls
+                    preload="none"
+                    className="w-full"
+                    style={{ height: 28 }}
+                  />
+                </div>
+              ) : (
+                <div className="relative aspect-video">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={a.kind === "video" ? a.posterUrl ?? VIDEO_PLACEHOLDER_POSTER : a.url}
+                    alt={a.name}
+                    loading="lazy"
+                    className="w-full h-full object-cover"
+                  />
+                  {a.kind === "video" && (
+                    <span className="absolute top-1.5 right-1.5 chip py-0.5 px-1.5" style={{ fontSize: 9 }}>
+                      video
+                    </span>
+                  )}
+                </div>
+              )}
               <div className="px-2 py-2">
                 {editingId === a.id ? (
                   <div className="flex gap-1">
