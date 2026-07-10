@@ -13,7 +13,7 @@ import { RunOfShowReviewModal } from "@/components/flow/RunOfShowReviewModal";
 import { liveBeatEnergy } from "@/lib/programEnergy";
 import { energyColor } from "@/lib/format";
 import { useDeck } from "@/store/useDeck";
-import { toEmbedUrl } from "@/lib/embed";
+import { toEmbedUrl, toVideoThumb } from "@/lib/embed";
 
 const PROJECT_SLUG = "jw-gala-garden-night";
 
@@ -396,33 +396,9 @@ function BeatRow({
                 Reference videos
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
-                {beat.refVideos.map((url, i) => {
-                  const embed = toEmbedUrl(url);
-                  return embed ? (
-                    <div
-                      key={i}
-                      className="relative w-full rounded-lg overflow-hidden border hairline"
-                      style={{ paddingBottom: "56.25%" }}
-                    >
-                      <iframe
-                        src={embed}
-                        className="absolute inset-0 w-full h-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-                  ) : (
-                    <a
-                      key={i}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[12px] emerald-text hover:underline break-all self-start"
-                    >
-                      ↗ {url}
-                    </a>
-                  );
-                })}
+                {beat.refVideos.map((url, i) => (
+                  <RefVideoPlayer key={i} url={url} />
+                ))}
               </div>
             </>
           )}
@@ -1046,43 +1022,19 @@ function BeatDrawer({
             </p>
           ) : (
             <div className="space-y-3 mb-3">
-              {(beat.refVideos ?? []).map((url, i) => {
-                const embed = toEmbedUrl(url);
-                return (
-                  <div key={i}>
-                    {embed ? (
-                      <div
-                        className="relative w-full rounded-xl overflow-hidden border hairline"
-                        style={{ paddingBottom: "56.25%" }}
-                      >
-                        <iframe
-                          src={embed}
-                          className="absolute inset-0 w-full h-full"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                        />
-                      </div>
-                    ) : (
-                      <a
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[12px] emerald-text hover:underline break-all"
-                      >
-                        ↗ {url}
-                      </a>
-                    )}
-                    {planner && canWrite && (
-                      <button
-                        onClick={() => removeRefVideo(beat.id, i)}
-                        className="text-[11px] text-[var(--text-faint)] hover:text-[var(--danger)] mt-1"
-                      >
-                        ✕ Remove
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
+              {(beat.refVideos ?? []).map((url, i) => (
+                <div key={i}>
+                  <RefVideoPlayer url={url} />
+                  {planner && canWrite && (
+                    <button
+                      onClick={() => removeRefVideo(beat.id, i)}
+                      className="text-[11px] text-[var(--text-faint)] hover:text-[var(--danger)] mt-1"
+                    >
+                      ✕ Remove
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
           )}
           {planner && canWrite && (
@@ -1109,6 +1061,84 @@ function BeatDrawer({
         </div>
       </div>
     </div>
+  );
+}
+
+// Click-to-load reference video: shows a thumbnail with a play badge (like
+// the uploaded-media gallery) instead of an always-mounted iframe. Some
+// pasted videos (YouTube Shorts especially) refuse to embed even though the
+// URL parses fine — loading the iframe only on tap avoids a permanently
+// broken-looking box for those, and still plays inline for the rest.
+function RefVideoPlayer({ url }: { url: string }) {
+  const [playing, setPlaying] = useState(false);
+  const embed = toEmbedUrl(url);
+  const thumb = toVideoThumb(url);
+
+  if (!embed) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[12px] emerald-text hover:underline break-all"
+      >
+        ↗ {url}
+      </a>
+    );
+  }
+
+  if (playing) {
+    return (
+      <div
+        className="relative w-full rounded-xl overflow-hidden border hairline"
+        style={{ paddingBottom: "56.25%" }}
+      >
+        <iframe
+          src={embed}
+          className="absolute inset-0 w-full h-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setPlaying(true)}
+      className="relative w-full rounded-xl overflow-hidden border hairline block"
+      style={{ paddingBottom: "56.25%" }}
+    >
+      {thumb ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={thumb} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      ) : (
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          style={{ background: "var(--bg-soft)" }}
+        >
+          <span className="text-[11px] text-[var(--text-faint)]">Reference video</span>
+        </div>
+      )}
+      <div
+        className="absolute inset-0 flex items-center justify-center"
+        style={{ background: "rgba(0,0,0,0.35)" }}
+      >
+        <span
+          className="w-10 h-10 rounded-full flex items-center justify-center"
+          style={{ background: "rgba(10,15,13,0.7)" }}
+        >
+          <span
+            style={{
+              borderLeft: "12px solid #fff",
+              borderTop: "8px solid transparent",
+              borderBottom: "8px solid transparent",
+              marginLeft: 3,
+            }}
+          />
+        </span>
+      </div>
+    </button>
   );
 }
 
