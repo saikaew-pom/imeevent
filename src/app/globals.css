@@ -218,3 +218,11 @@ input[type="range"] {
 .fade-up {
   animation: fadeUp 0.35s ease both;
 }
+
+/* Presentation PDF export renders the same slide elements off-screen to
+   rasterize them — this keeps editor-only affordances (regenerate/edit/
+   reset/delete buttons) out of the exported pages without needing a
+   separate export-only render path. */
+.pdf-export .slide-controls {
+  display: none !important;
+}

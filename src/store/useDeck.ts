@@ -41,7 +41,7 @@ const MEDIA_CHUNK_BYTES = 8 * 1024 * 1024; // 8MB
 // Lineup/program/financials are shared project state (D1-backed) but change
 // on every keystroke (cost line inputs, drag reorders, etc), so we push each
 // key to the server on a short debounce instead of one request per edit.
-type StateKey = "lineup" | "program" | "financials" | "presentation";
+type StateKey = "lineup" | "program" | "financials" | "presentation" | "hiddenSlides";
 const persistTimers: Partial<Record<StateKey, ReturnType<typeof setTimeout>>> = {};
 
 function schedulePersist(slug: string | null, key: StateKey, data: unknown) {
@@ -71,6 +71,8 @@ interface DeckState {
   program: Beat[];
   presentation: Slide[];
   slideGenerating: string | null; // beatId currently being generated, if any
+  slideBatchProgress: { current: number; total: number } | null;
+  hiddenSlides: string[]; // slide keys hidden from the presentation deck
   tasks: ProjectTask[];
   tasksLoaded: boolean;
   members: ProjectMember[];
@@ -135,8 +137,18 @@ interface DeckState {
   // a plain state write); manual edits go through the same debounced-state
   // path as lineup/program/financials.
   generateSlide: (slug: string, beatId: string) => Promise<{ ok: boolean; error?: string }>;
+  generateAllSlides: (
+    slug: string
+  ) => Promise<{ ok: boolean; generated: number; failed: number }>;
   updateSlide: (id: string, patch: Partial<Slide>) => void;
   removeSlide: (id: string) => void;
+
+  // Which slides (static or beat-based, identified by a stable string key)
+  // are hidden from the presentation deck — lets a planner drop any slide
+  // without losing its underlying data, and restore it later.
+  hideSlide: (key: string) => void;
+  restoreSlide: (key: string) => void;
+  restoreAllSlides: () => void;
 
   // Project management timeline — prep tasks/deadlines, D1-backed per
   // project (own table, not the JSON-blob project_state), same async
@@ -226,6 +238,8 @@ export const useDeck = create<DeckState>()(
         schedulePersist(get().projectSlug, "financials", get().financials);
       const persistPresentation = () =>
         schedulePersist(get().projectSlug, "presentation", get().presentation);
+      const persistHiddenSlides = () =>
+        schedulePersist(get().projectSlug, "hiddenSlides", get().hiddenSlides);
 
       return {
         lineup: [],
@@ -241,6 +255,8 @@ export const useDeck = create<DeckState>()(
         program: runOfShow.map((b) => ({ ...b })),
         presentation: [],
         slideGenerating: null,
+        slideBatchProgress: null,
+        hiddenSlides: [],
         tasks: [],
         tasksLoaded: false,
         members: [],
@@ -496,6 +512,7 @@ export const useDeck = create<DeckState>()(
               program: Beat[] | null;
               financials: FinancialAssumptions | null;
               presentation: Slide[] | null;
+              hiddenSlides: string[] | null;
             }>(`/api/builder/state?slug=${encodeURIComponent(slug)}`);
             set({
               projectSlug: slug,
@@ -505,6 +522,7 @@ export const useDeck = create<DeckState>()(
               ...(data.program !== null ? { program: data.program } : {}),
               ...(data.financials !== null ? { financials: data.financials } : {}),
               ...(data.presentation !== null ? { presentation: data.presentation } : {}),
+              ...(data.hiddenSlides !== null ? { hiddenSlides: data.hiddenSlides } : {}),
             });
           } catch {
             set({ projectSlug: slug, sharedStateLoaded: true });
@@ -613,6 +631,42 @@ export const useDeck = create<DeckState>()(
           if (!isWritable(get().myRole)) return;
           set((s) => ({ presentation: s.presentation.filter((sl) => sl.id !== id) }));
           persistPresentation();
+        },
+
+        generateAllSlides: async (slug) => {
+          if (!isWritable(get().myRole)) return { ok: false, generated: 0, failed: 0 };
+          const beatIds = get().program.map((b) => b.id);
+          set({ slideBatchProgress: { current: 0, total: beatIds.length } });
+          let generated = 0;
+          let failed = 0;
+          for (let i = 0; i < beatIds.length; i++) {
+            const result = await get().generateSlide(slug, beatIds[i]);
+            if (result.ok) generated++;
+            else failed++;
+            set({ slideBatchProgress: { current: i + 1, total: beatIds.length } });
+          }
+          set({ slideBatchProgress: null });
+          return { ok: failed === 0, generated, failed };
+        },
+
+        hideSlide: (key) => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => ({
+            hiddenSlides: s.hiddenSlides.includes(key) ? s.hiddenSlides : [...s.hiddenSlides, key],
+          }));
+          persistHiddenSlides();
+        },
+
+        restoreSlide: (key) => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => ({ hiddenSlides: s.hiddenSlides.filter((k) => k !== key) }));
+          persistHiddenSlides();
+        },
+
+        restoreAllSlides: () => {
+          if (!isWritable(get().myRole)) return;
+          set({ hiddenSlides: [] });
+          persistHiddenSlides();
         },
 
         hydrateTasks: async (slug) => {
@@ -1045,6 +1099,8 @@ export const useDeck = create<DeckState>()(
           financials,
           presentation,
           slideGenerating,
+          slideBatchProgress,
+          hiddenSlides,
           tasks,
           tasksLoaded,
           members,
@@ -1067,6 +1123,8 @@ export const useDeck = create<DeckState>()(
         void financials;
         void presentation;
         void slideGenerating;
+        void slideBatchProgress;
+        void hiddenSlides;
         void tasks;
         void tasksLoaded;
         void members;

@@ -1,7 +1,13 @@
 import "server-only";
 import { getDB } from "@/lib/cf";
 
-export const STATE_KEYS = ["lineup", "program", "financials", "presentation"] as const;
+export const STATE_KEYS = [
+  "lineup",
+  "program",
+  "financials",
+  "presentation",
+  "hiddenSlides",
+] as const;
 export type StateKey = (typeof STATE_KEYS)[number];
 
 interface StateRow {
@@ -25,6 +31,7 @@ export async function getProjectState(
     program: null,
     financials: null,
     presentation: null,
+    hiddenSlides: null,
   };
   for (const row of results) {
     if (STATE_KEYS.includes(row.key)) {
