@@ -43,8 +43,18 @@ export default function FlowPage() {
   const customActs = useDeck((s) => s.customActs);
   const addProgramBeat = useDeck((s) => s.addProgramBeat);
   const resetProgram = useDeck((s) => s.resetProgram);
+  const removeProgramBeat = useDeck((s) => s.removeProgramBeat);
+  const reorderProgram = useDeck((s) => s.reorderProgram);
   const myRole = useDeck((s) => s.myRole);
   const canWrite = myRole === "owner" || myRole === "editor";
+
+  const moveBeat = (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= program.length) return;
+    const next = [...program];
+    [next[index], next[target]] = [next[target], next[index]];
+    reorderProgram(next.map((b) => b.id));
+  };
 
   const toggle = (id: string) =>
     setExpanded((s) => {
@@ -144,15 +154,21 @@ export default function FlowPage() {
 
       {/* Timeline */}
       <section className="grid gap-2.5 mt-4">
-        {program.map((b) => (
+        {program.map((b, i) => (
           <BeatRow
             key={b.id}
             beat={b}
             view={view}
+            canWrite={canWrite}
             customActs={customActs}
             expanded={expanded.has(b.id)}
             onToggle={() => toggle(b.id)}
             onDetails={() => setSelected(b.id)}
+            isFirst={i === 0}
+            isLast={i === program.length - 1}
+            onMoveUp={() => moveBeat(i, -1)}
+            onMoveDown={() => moveBeat(i, 1)}
+            onDelete={() => removeProgramBeat(b.id)}
           />
         ))}
       </section>
@@ -210,17 +226,29 @@ export default function FlowPage() {
 function BeatRow({
   beat,
   view,
+  canWrite,
   customActs,
   expanded,
   onToggle,
   onDetails,
+  isFirst,
+  isLast,
+  onMoveUp,
+  onMoveDown,
+  onDelete,
 }: {
   beat: Beat;
   view: "planner" | "client";
+  canWrite: boolean;
   customActs: Act[];
   expanded: boolean;
   onToggle: () => void;
   onDetails: () => void;
+  isFirst: boolean;
+  isLast: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onDelete: () => void;
 }) {
   const energy = liveBeatEnergy(beat, customActs);
   const color = energyColor(energy);
@@ -322,6 +350,57 @@ function BeatRow({
           >
             ▷ {beat.gallery.length}
           </span>
+        )}
+        {view === "planner" && canWrite && (
+          <div className="flex items-center gap-1 shrink-0">
+            <span
+              role="button"
+              aria-disabled={isFirst}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isFirst) onMoveUp();
+              }}
+              className={`text-[11px] shrink-0 ${
+                isFirst ? "" : "hover:text-[var(--gold-bright)]"
+              }`}
+              style={{
+                color: isFirst ? "var(--border)" : "var(--text-faint)",
+                cursor: isFirst ? "default" : "pointer",
+              }}
+              title="Move earlier"
+            >
+              ▲
+            </span>
+            <span
+              role="button"
+              aria-disabled={isLast}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isLast) onMoveDown();
+              }}
+              className={`text-[11px] shrink-0 ${
+                isLast ? "" : "hover:text-[var(--gold-bright)]"
+              }`}
+              style={{
+                color: isLast ? "var(--border)" : "var(--text-faint)",
+                cursor: isLast ? "default" : "pointer",
+              }}
+              title="Move later"
+            >
+              ▼
+            </span>
+            <span
+              role="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="text-[11px] text-[var(--text-faint)] hover:text-[var(--danger)] shrink-0 ml-0.5"
+              title="Delete this program"
+            >
+              🗑
+            </span>
+          </div>
         )}
         {view === "planner" && (
           <span
