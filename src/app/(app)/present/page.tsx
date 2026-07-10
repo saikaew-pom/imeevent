@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { useDeck } from "@/store/useDeck";
+import { useDeck, LineupItem } from "@/store/useDeck";
 import { eventMeta, Beat } from "@/data/runOfShow";
 import { EnergyCurve, CurvePoint } from "@/components/EnergyCurve";
 import { curvePoints, lineupTotals, orderedLineup } from "@/lib/analysis";
 import { liveBeatEnergy } from "@/lib/programEnergy";
-import { computePnL } from "@/lib/pnl";
+import { computePnL, PnL } from "@/lib/pnl";
 import { finaleConcepts, goldenBloom } from "@/data/finale";
 import { thb, pct } from "@/lib/format";
 import { findAct, Act, PLACEHOLDER_PHOTO } from "@/data/acts";
@@ -30,6 +30,7 @@ export default function PresentPage() {
   const presentation = useDeck((s) => s.presentation);
   const myRole = useDeck((s) => s.myRole);
   const generateSlide = useDeck((s) => s.generateSlide);
+  const generateStaticSlide = useDeck((s) => s.generateStaticSlide);
   const generateAllSlides = useDeck((s) => s.generateAllSlides);
   const updateSlide = useDeck((s) => s.updateSlide);
   const removeSlide = useDeck((s) => s.removeSlide);
@@ -62,68 +63,52 @@ export default function PresentPage() {
       key: "title",
       label: "Title",
       node: (
-        <Slide center>
-          <div className="chip mb-6">{eventMeta.venue} · NYE 2026</div>
-          <h1 className="font-display italic text-5xl md:text-7xl gold-gradient leading-[1.05] mb-5">
-            JW Gala Garden Night
-          </h1>
-          <p className="text-lg text-[var(--text-dim)] max-w-2xl">
-            {eventMeta.date} · {eventMeta.timing}
-          </p>
-          <p className="text-[14px] text-[var(--text-faint)] mt-2">
-            {eventMeta.guests} · {eventMeta.theme}
-          </p>
-        </Slide>
+        <TitleSlide
+          slide={presentation.find((s) => s.id === "title")}
+          canWrite={canWrite}
+          generating={slideGenerating === "title"}
+          onGenerate={() => generateStaticSlide(PROJECT_SLUG, "title")}
+          onSave={(patch) => updateSlide("title", patch)}
+          onReset={
+            presentation.find((s) => s.id === "title") ? () => removeSlide("title") : undefined
+          }
+        />
       ),
     },
     {
       key: "flow",
       label: "Concept",
       node: (
-        <Slide>
-          <SlideTitle kicker="The concept" title="One rising curve, four peaks" />
-          <p className="text-[15px] text-[var(--text-dim)] max-w-4xl leading-relaxed mb-6">
-            {eventMeta.concept}
-          </p>
-          <div className="panel px-6 py-6">
-            <EnergyCurve points={flowPoints} height={300} compact />
-          </div>
-        </Slide>
+        <ConceptSlide
+          slide={presentation.find((s) => s.id === "flow")}
+          flowPoints={flowPoints}
+          canWrite={canWrite}
+          generating={slideGenerating === "flow"}
+          onGenerate={() => generateStaticSlide(PROJECT_SLUG, "flow")}
+          onSave={(patch) => updateSlide("flow", patch)}
+          onReset={
+            presentation.find((s) => s.id === "flow") ? () => removeSlide("flow") : undefined
+          }
+        />
       ),
     },
     {
       key: "lineup",
       label: "Lineup",
       node: (
-        <Slide>
-          <SlideTitle
-            kicker="The show"
-            title={
-              ordered.length > 0
-                ? `${totals.count}-act lineup · ${totals.totalDuration} min on stage`
-                : "Build a lineup to present it here"
-            }
-          />
-          {ordered.length > 0 ? (
-            <>
-              <div className="panel px-6 py-5 mb-4">
-                <EnergyCurve points={myPoints} height={230} compact />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {ordered.map((o) => (
-                  <span key={o.uid} className="chip">
-                    {o.act.name}
-                  </span>
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="text-[var(--text-faint)]">
-              Head to the Show &amp; Decor Builder and generate a lineup — it appears
-              here live.
-            </p>
-          )}
-        </Slide>
+        <LineupSlide
+          slide={presentation.find((s) => s.id === "lineup")}
+          ordered={ordered}
+          totals={totals}
+          myPoints={myPoints}
+          canWrite={canWrite}
+          generating={slideGenerating === "lineup"}
+          onGenerate={() => generateStaticSlide(PROJECT_SLUG, "lineup")}
+          onSave={(patch) => updateSlide("lineup", patch)}
+          onReset={
+            presentation.find((s) => s.id === "lineup") ? () => removeSlide("lineup") : undefined
+          }
+        />
       ),
     },
     // One slide per Event Flow beat, AI-drafted (or a live fallback built
@@ -157,51 +142,35 @@ export default function PresentPage() {
       key: "finale",
       label: "Finale",
       node: (
-        <Slide>
-          <SlideTitle kicker="The finale" title={goldenBloom.title} />
-          <div className="grid md:grid-cols-2 gap-6 items-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={finaleConcepts[1].image}
-              alt="Golden Bloom"
-              className="w-full rounded-2xl border hairline"
-            />
-            <div>
-              <p className="text-[15px] text-[var(--text-dim)] leading-relaxed mb-4">
-                {goldenBloom.concept}
-              </p>
-              <ul className="space-y-1.5">
-                {goldenBloom.successCriteria.slice(0, 3).map((s) => (
-                  <li key={s} className="flex gap-2 text-[13px] text-[var(--text-dim)]">
-                    <span className="emerald-text">✓</span>
-                    {s}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </Slide>
+        <FinaleSlide
+          slide={presentation.find((s) => s.id === "finale")}
+          canWrite={canWrite}
+          generating={slideGenerating === "finale"}
+          onGenerate={() => generateStaticSlide(PROJECT_SLUG, "finale")}
+          onSave={(patch) => updateSlide("finale", patch)}
+          onReset={
+            presentation.find((s) => s.id === "finale") ? () => removeSlide("finale") : undefined
+          }
+        />
       ),
     },
     {
       key: "numbers",
       label: "Numbers",
       node: (
-        <Slide>
-          <SlideTitle kicker="The numbers" title="Revenue model at a glance" />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <BigStat label="Revenue" value={thb(pnl.totalRevenue)} tone="emerald" />
-            <BigStat label="Total cost" value={thb(pnl.totalCost)} tone="danger" />
-            <BigStat label="Gross profit" value={thb(pnl.grossProfit)} tone="gold" />
-            <BigStat label="Margin" value={pct(pnl.marginPct)} tone="gold" />
-          </div>
-          <p className="text-[13px] text-[var(--text-faint)] mt-6">
-            {pnl.pax} guests · entertainment {thb(pnl.entertainment)} (
-            {pct(pnl.entertainmentPctRev)} of revenue) · break-even at{" "}
-            {Math.ceil(pnl.breakEvenQty)} {pnl.primaryTierName.toLowerCase()}. Planning
-            estimates — costs are editable placeholders.
-          </p>
-        </Slide>
+        <NumbersSlide
+          slide={presentation.find((s) => s.id === "numbers")}
+          pnl={pnl}
+          canWrite={canWrite}
+          generating={slideGenerating === "numbers"}
+          onGenerate={() => generateStaticSlide(PROJECT_SLUG, "numbers")}
+          onSave={(patch) => updateSlide("numbers", patch)}
+          onReset={
+            presentation.find((s) => s.id === "numbers")
+              ? () => removeSlide("numbers")
+              : undefined
+          }
+        />
       ),
     },
   ];
@@ -324,8 +293,9 @@ export default function PresentPage() {
                   style={{ background: "var(--bg-soft)" }}
                 >
                   <p className="text-[12.5px] text-[var(--text-dim)] mb-3">
-                    Regenerate all {program.length} beat slides with AI, based on the
-                    current Event Flow info? This overwrites any manual edits.
+                    Regenerate all {program.length + 5} slides with AI (every beat plus
+                    the title, concept, lineup, finale and numbers slides), based on the
+                    current info? This overwrites any manual edits.
                   </p>
                   <div className="flex justify-end gap-2">
                     <button
@@ -437,6 +407,49 @@ function hasRealPhoto(a: Act): boolean {
   return Boolean(a.photo) && a.photo !== PLACEHOLDER_PHOTO;
 }
 
+// Shared Generate/Edit/Reset button row used by every editable slide (the
+// per-beat slides and the 5 static ones). slide-controls keeps it out of the
+// PDF export via the global CSS rule scoped to .pdf-export.
+function SlideAIControls({
+  canWrite,
+  generating,
+  hasSlide,
+  onGenerate,
+  onEdit,
+  onReset,
+}: {
+  canWrite: boolean;
+  generating: boolean;
+  hasSlide: boolean;
+  onGenerate: () => void;
+  onEdit: () => void;
+  onReset?: () => void;
+}) {
+  if (!canWrite) return null;
+  return (
+    <div className="slide-controls flex gap-2 shrink-0 pt-1">
+      <button
+        onClick={onGenerate}
+        disabled={generating}
+        className="btn py-1.5 px-3 text-[12px] disabled:opacity-50"
+      >
+        {generating ? "Generating…" : hasSlide ? "↻ Regenerate" : "✦ Generate with AI"}
+      </button>
+      <button onClick={onEdit} className="btn py-1.5 px-3 text-[12px]">
+        ✎ Edit
+      </button>
+      {onReset && (
+        <button
+          onClick={onReset}
+          className="btn py-1.5 px-3 text-[12px] hover:text-[var(--danger)]"
+        >
+          ↺ Reset
+        </button>
+      )}
+    </div>
+  );
+}
+
 function BeatSlide({
   beat,
   slide,
@@ -471,28 +484,14 @@ function BeatSlide({
     <Slide>
       <div className="flex items-start justify-between gap-4 mb-2">
         <SlideTitle kicker={`Run of show · ${beat.time}`} title={title} />
-        {canWrite && (
-          <div className="slide-controls flex gap-2 shrink-0 pt-1">
-            <button
-              onClick={onGenerate}
-              disabled={generating}
-              className="btn py-1.5 px-3 text-[12px] disabled:opacity-50"
-            >
-              {generating ? "Generating…" : slide?.aiGenerated ? "↻ Regenerate" : "✦ Generate with AI"}
-            </button>
-            <button onClick={() => setEditing(true)} className="btn py-1.5 px-3 text-[12px]">
-              ✎ Edit
-            </button>
-            {onReset && (
-              <button
-                onClick={onReset}
-                className="btn py-1.5 px-3 text-[12px] hover:text-[var(--danger)]"
-              >
-                ↺ Reset
-              </button>
-            )}
-          </div>
-        )}
+        <SlideAIControls
+          canWrite={canWrite}
+          generating={generating}
+          hasSlide={Boolean(slide?.aiGenerated)}
+          onGenerate={onGenerate}
+          onEdit={() => setEditing(true)}
+          onReset={onReset}
+        />
       </div>
       <p className="text-[13px] emerald-text mb-4">{subtitle}</p>
       <div className="grid md:grid-cols-2 gap-6 items-center">
@@ -521,6 +520,266 @@ function BeatSlide({
           initial={{ title, subtitle, body, imageUrl: image }}
           onClose={() => setEditing(false)}
           onSave={onSave}
+        />
+      )}
+    </Slide>
+  );
+}
+
+interface StaticSlideProps {
+  slide?: SlideData;
+  canWrite: boolean;
+  generating: boolean;
+  onGenerate: () => void;
+  onSave: (patch: Partial<SlideData>) => void;
+  onReset?: () => void;
+}
+
+function TitleSlide({ slide, canWrite, generating, onGenerate, onSave, onReset }: StaticSlideProps) {
+  const [editing, setEditing] = useState(false);
+  const title = slide?.title || "JW Gala Garden Night";
+
+  return (
+    <Slide center>
+      <div className="chip mb-6">{eventMeta.venue} · NYE 2026</div>
+      <h1 className="font-display italic text-5xl md:text-7xl gold-gradient leading-[1.05] mb-5">
+        {title}
+      </h1>
+      {slide?.subtitle && (
+        <p className="text-lg gold-text italic mb-1">{slide.subtitle}</p>
+      )}
+      <p className="text-lg text-[var(--text-dim)] max-w-2xl">
+        {eventMeta.date} · {eventMeta.timing}
+      </p>
+      <p className="text-[14px] text-[var(--text-faint)] mt-2">
+        {eventMeta.guests} · {eventMeta.theme}
+      </p>
+      {slide?.body && (
+        <p className="text-[13px] text-[var(--text-faint)] mt-4 max-w-xl">{slide.body}</p>
+      )}
+      <div className="mt-6">
+        <SlideAIControls
+          canWrite={canWrite}
+          generating={generating}
+          hasSlide={Boolean(slide?.aiGenerated)}
+          onGenerate={onGenerate}
+          onEdit={() => setEditing(true)}
+          onReset={onReset}
+        />
+      </div>
+      {editing && (
+        <SlideEditorModal
+          initial={{ title, subtitle: slide?.subtitle ?? "", body: slide?.body ?? "" }}
+          onClose={() => setEditing(false)}
+          onSave={onSave}
+          hidePhoto
+        />
+      )}
+    </Slide>
+  );
+}
+
+function ConceptSlide({
+  slide,
+  flowPoints,
+  canWrite,
+  generating,
+  onGenerate,
+  onSave,
+  onReset,
+}: StaticSlideProps & { flowPoints: CurvePoint[] }) {
+  const [editing, setEditing] = useState(false);
+  const title = slide?.title || "One rising curve, four peaks";
+  const body = slide?.body || eventMeta.concept;
+
+  return (
+    <Slide>
+      <div className="flex items-start justify-between gap-4 mb-2">
+        <SlideTitle kicker="The concept" title={title} />
+        <SlideAIControls
+          canWrite={canWrite}
+          generating={generating}
+          hasSlide={Boolean(slide?.aiGenerated)}
+          onGenerate={onGenerate}
+          onEdit={() => setEditing(true)}
+          onReset={onReset}
+        />
+      </div>
+      {slide?.subtitle && <p className="text-[13px] emerald-text mb-3">{slide.subtitle}</p>}
+      <p className="text-[15px] text-[var(--text-dim)] max-w-4xl leading-relaxed mb-6">{body}</p>
+      <div className="panel px-6 py-6">
+        <EnergyCurve points={flowPoints} height={300} compact />
+      </div>
+      {editing && (
+        <SlideEditorModal
+          initial={{ title, subtitle: slide?.subtitle ?? "", body }}
+          onClose={() => setEditing(false)}
+          onSave={onSave}
+          hidePhoto
+        />
+      )}
+    </Slide>
+  );
+}
+
+function LineupSlide({
+  slide,
+  ordered,
+  totals,
+  myPoints,
+  canWrite,
+  generating,
+  onGenerate,
+  onSave,
+  onReset,
+}: StaticSlideProps & {
+  ordered: (LineupItem & { act: Act })[];
+  totals: ReturnType<typeof lineupTotals>;
+  myPoints: CurvePoint[];
+}) {
+  const [editing, setEditing] = useState(false);
+  const defaultTitle =
+    ordered.length > 0
+      ? `${totals.count}-act lineup · ${totals.totalDuration} min on stage`
+      : "Build a lineup to present it here";
+  const title = slide?.title || defaultTitle;
+
+  return (
+    <Slide>
+      <div className="flex items-start justify-between gap-4 mb-2">
+        <SlideTitle kicker="The show" title={title} />
+        <SlideAIControls
+          canWrite={canWrite}
+          generating={generating}
+          hasSlide={Boolean(slide?.aiGenerated)}
+          onGenerate={onGenerate}
+          onEdit={() => setEditing(true)}
+          onReset={onReset}
+        />
+      </div>
+      {slide?.subtitle && <p className="text-[13px] emerald-text mb-3">{slide.subtitle}</p>}
+      {ordered.length > 0 ? (
+        <>
+          {slide?.body && (
+            <p className="text-[14px] text-[var(--text-dim)] leading-relaxed mb-4">{slide.body}</p>
+          )}
+          <div className="panel px-6 py-5 mb-4">
+            <EnergyCurve points={myPoints} height={230} compact />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {ordered.map((o) => (
+              <span key={o.uid} className="chip">
+                {o.act.name}
+              </span>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="text-[var(--text-faint)]">
+          Head to the Show &amp; Decor Builder and generate a lineup — it appears here live.
+        </p>
+      )}
+      {editing && (
+        <SlideEditorModal
+          initial={{ title, subtitle: slide?.subtitle ?? "", body: slide?.body ?? "" }}
+          onClose={() => setEditing(false)}
+          onSave={onSave}
+          hidePhoto
+        />
+      )}
+    </Slide>
+  );
+}
+
+function FinaleSlide({ slide, canWrite, generating, onGenerate, onSave, onReset }: StaticSlideProps) {
+  const [editing, setEditing] = useState(false);
+  const title = slide?.title || goldenBloom.title;
+  const body = slide?.body || goldenBloom.concept;
+  const image = slide?.imageUrl || finaleConcepts[1].image;
+
+  return (
+    <Slide>
+      <div className="flex items-start justify-between gap-4 mb-2">
+        <SlideTitle kicker="The finale" title={title} />
+        <SlideAIControls
+          canWrite={canWrite}
+          generating={generating}
+          hasSlide={Boolean(slide?.aiGenerated)}
+          onGenerate={onGenerate}
+          onEdit={() => setEditing(true)}
+          onReset={onReset}
+        />
+      </div>
+      {slide?.subtitle && <p className="text-[13px] emerald-text mb-3">{slide.subtitle}</p>}
+      <div className="grid md:grid-cols-2 gap-6 items-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={image} alt="Golden Bloom" className="w-full rounded-2xl border hairline" />
+        <div>
+          <p className="text-[15px] text-[var(--text-dim)] leading-relaxed mb-4">{body}</p>
+          <ul className="space-y-1.5">
+            {goldenBloom.successCriteria.slice(0, 3).map((s) => (
+              <li key={s} className="flex gap-2 text-[13px] text-[var(--text-dim)]">
+                <span className="emerald-text">✓</span>
+                {s}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      {editing && (
+        <SlideEditorModal
+          initial={{ title, subtitle: slide?.subtitle ?? "", body, imageUrl: image }}
+          onClose={() => setEditing(false)}
+          onSave={onSave}
+        />
+      )}
+    </Slide>
+  );
+}
+
+function NumbersSlide({
+  slide,
+  pnl,
+  canWrite,
+  generating,
+  onGenerate,
+  onSave,
+  onReset,
+}: StaticSlideProps & { pnl: PnL }) {
+  const [editing, setEditing] = useState(false);
+  const title = slide?.title || "Revenue model at a glance";
+  const defaultBody = `${pnl.pax} guests · entertainment ${thb(pnl.entertainment)} (${pct(
+    pnl.entertainmentPctRev
+  )} of revenue) · break-even at ${Math.ceil(pnl.breakEvenQty)} ${pnl.primaryTierName.toLowerCase()}. Planning estimates — costs are editable placeholders.`;
+  const body = slide?.body || defaultBody;
+
+  return (
+    <Slide>
+      <div className="flex items-start justify-between gap-4 mb-2">
+        <SlideTitle kicker="The numbers" title={title} />
+        <SlideAIControls
+          canWrite={canWrite}
+          generating={generating}
+          hasSlide={Boolean(slide?.aiGenerated)}
+          onGenerate={onGenerate}
+          onEdit={() => setEditing(true)}
+          onReset={onReset}
+        />
+      </div>
+      {slide?.subtitle && <p className="text-[13px] emerald-text mb-3">{slide.subtitle}</p>}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <BigStat label="Revenue" value={thb(pnl.totalRevenue)} tone="emerald" />
+        <BigStat label="Total cost" value={thb(pnl.totalCost)} tone="danger" />
+        <BigStat label="Gross profit" value={thb(pnl.grossProfit)} tone="gold" />
+        <BigStat label="Margin" value={pct(pnl.marginPct)} tone="gold" />
+      </div>
+      <p className="text-[13px] text-[var(--text-faint)] mt-6">{body}</p>
+      {editing && (
+        <SlideEditorModal
+          initial={{ title, subtitle: slide?.subtitle ?? "", body }}
+          onClose={() => setEditing(false)}
+          onSave={onSave}
+          hidePhoto
         />
       )}
     </Slide>

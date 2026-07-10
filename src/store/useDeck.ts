@@ -19,6 +19,10 @@ export interface LineupItem {
   actId: string;
 }
 
+// Mirrors STATIC_SLIDE_KEYS in the server-only src/lib/builder/presentation.ts
+// (kept as a separate const here since that module can't be imported client-side).
+const STATIC_SLIDE_KEYS = ["title", "flow", "lineup", "finale", "numbers"] as const;
+
 // Kept local (not imported from the server-only auth/queries module) so the
 // client store never pulls in "server-only" code.
 export type ProjectRole = "owner" | "editor" | "viewer";
@@ -137,6 +141,10 @@ interface DeckState {
   // a plain state write); manual edits go through the same debounced-state
   // path as lineup/program/financials.
   generateSlide: (slug: string, beatId: string) => Promise<{ ok: boolean; error?: string }>;
+  generateStaticSlide: (
+    slug: string,
+    staticKey: string
+  ) => Promise<{ ok: boolean; error?: string }>;
   generateAllSlides: (
     slug: string
   ) => Promise<{ ok: boolean; generated: number; failed: number }>;
@@ -617,13 +625,48 @@ export const useDeck = create<DeckState>()(
           }
         },
 
+        generateStaticSlide: async (slug, staticKey) => {
+          if (!isWritable(get().myRole)) return { ok: false, error: "Read-only access." };
+          set({ slideGenerating: staticKey });
+          try {
+            const data = await apiJson<{ slide: Slide }>("/api/builder/presentation/generate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug, staticKey }),
+            });
+            set((s) => ({
+              presentation: [...s.presentation.filter((sl) => sl.id !== staticKey), data.slide],
+            }));
+            return { ok: true };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Generation failed." };
+          } finally {
+            set({ slideGenerating: null });
+          }
+        },
+
         updateSlide: (id, patch) => {
           if (!isWritable(get().myRole)) return;
-          set((s) => ({
-            presentation: s.presentation.map((sl) =>
-              sl.id === id ? { ...sl, ...patch, aiGenerated: false } : sl
-            ),
-          }));
+          set((s) => {
+            const exists = s.presentation.some((sl) => sl.id === id);
+            return {
+              presentation: exists
+                ? s.presentation.map((sl) =>
+                    sl.id === id ? { ...sl, ...patch, aiGenerated: false } : sl
+                  )
+                : [
+                    ...s.presentation,
+                    {
+                      id,
+                      title: "",
+                      subtitle: "",
+                      body: "",
+                      ...patch,
+                      aiGenerated: false,
+                    } as Slide,
+                  ],
+            };
+          });
           persistPresentation();
         },
 
@@ -636,14 +679,24 @@ export const useDeck = create<DeckState>()(
         generateAllSlides: async (slug) => {
           if (!isWritable(get().myRole)) return { ok: false, generated: 0, failed: 0 };
           const beatIds = get().program.map((b) => b.id);
-          set({ slideBatchProgress: { current: 0, total: beatIds.length } });
+          const total = beatIds.length + STATIC_SLIDE_KEYS.length;
+          set({ slideBatchProgress: { current: 0, total } });
           let generated = 0;
           let failed = 0;
-          for (let i = 0; i < beatIds.length; i++) {
-            const result = await get().generateSlide(slug, beatIds[i]);
+          let done = 0;
+          for (const beatId of beatIds) {
+            const result = await get().generateSlide(slug, beatId);
             if (result.ok) generated++;
             else failed++;
-            set({ slideBatchProgress: { current: i + 1, total: beatIds.length } });
+            done++;
+            set({ slideBatchProgress: { current: done, total } });
+          }
+          for (const key of STATIC_SLIDE_KEYS) {
+            const result = await get().generateStaticSlide(slug, key);
+            if (result.ok) generated++;
+            else failed++;
+            done++;
+            set({ slideBatchProgress: { current: done, total } });
           }
           set({ slideBatchProgress: null });
           return { ok: failed === 0, generated, failed };

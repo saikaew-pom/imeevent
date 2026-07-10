@@ -9,10 +9,12 @@ export function SlideEditorModal({
   initial,
   onClose,
   onSave,
+  hidePhoto,
 }: {
   initial: { title: string; subtitle: string; body: string; imageUrl?: string };
   onClose: () => void;
   onSave: (patch: Partial<Slide>) => void;
+  hidePhoto?: boolean;
 }) {
   const [title, setTitle] = useState(initial.title);
   const [subtitle, setSubtitle] = useState(initial.subtitle);
@@ -101,6 +103,7 @@ export function SlideEditorModal({
               }}
             />
           </Field>
+          {!hidePhoto && (
           <Field label="Photo">
             <div className="flex items-center gap-3">
               {imageUrl && (
@@ -128,6 +131,7 @@ export function SlideEditorModal({
               </label>
             </div>
           </Field>
+          )}
           {error && (
             <p className="text-[12px]" style={{ color: "var(--danger)" }}>
               {error}
