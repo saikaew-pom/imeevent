@@ -861,15 +861,24 @@ function BeatDrawer({
           {beat.links && beat.links.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-2">
               {beat.links.map((l) => (
-                <a
-                  key={l.url}
-                  href={l.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn py-1.5 px-3 text-[12px]"
-                >
-                  ↗ {l.label}
-                </a>
+                <span key={l.url} className="btn py-1.5 px-3 text-[12px] flex items-center gap-2">
+                  <a href={l.url} target="_blank" rel="noopener noreferrer">
+                    ↗ {l.label}
+                  </a>
+                  {planner && canWrite && (
+                    <button
+                      onClick={() =>
+                        updateProgramBeat(beat.id, {
+                          links: (beat.links ?? []).filter((x) => x.url !== l.url),
+                        })
+                      }
+                      className="text-[var(--text-faint)] hover:text-[var(--danger)]"
+                      title="Remove this link"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </span>
               ))}
             </div>
           )}
