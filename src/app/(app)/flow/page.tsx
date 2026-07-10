@@ -1094,16 +1094,29 @@ function RefVideoPlayer({ url }: { url: string }) {
 
   if (playing) {
     return (
-      <div
-        className="relative w-full rounded-xl overflow-hidden border hairline"
-        style={{ paddingBottom: "56.25%" }}
-      >
-        <iframe
-          src={embed}
-          className="absolute inset-0 w-full h-full"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        />
+      <div>
+        <div
+          className="relative w-full rounded-xl overflow-hidden border hairline"
+          style={{ paddingBottom: "56.25%" }}
+        >
+          <iframe
+            src={embed}
+            className="absolute inset-0 w-full h-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+        {/* Some videos refuse to embed (the owner disabled it) and there's
+            no way to detect that from outside a cross-origin iframe, so
+            always offer a guaranteed way to actually watch it. */}
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[11px] text-[var(--text-faint)] hover:text-[var(--gold-bright)] mt-1 inline-block"
+        >
+          Video not playing? ↗ Open on YouTube/Vimeo directly
+        </a>
       </div>
     );
   }
