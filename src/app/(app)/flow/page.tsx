@@ -9,6 +9,7 @@ import { MediaGallery } from "@/components/MediaGallery";
 import { MediaPicker } from "@/components/media/MediaPicker";
 import { ItemFormModal } from "@/components/builder/ItemFormModal";
 import { TalentFormModal } from "@/components/timeline/TalentFormModal";
+import { RunOfShowReviewModal } from "@/components/flow/RunOfShowReviewModal";
 import { liveBeatEnergy } from "@/lib/programEnergy";
 import { energyColor } from "@/lib/format";
 import { useDeck } from "@/store/useDeck";
@@ -35,6 +36,7 @@ export default function FlowPage() {
   const [view, setView] = useState<"planner" | "client">("planner");
   const [selected, setSelected] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   const program = useDeck((s) => s.program);
   const customActs = useDeck((s) => s.customActs);
@@ -77,6 +79,14 @@ export default function FlowPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {view === "planner" && canWrite && (
+            <button
+              onClick={() => setReviewOpen(true)}
+              className="btn py-1.5 px-3 text-[12px]"
+            >
+              ✨ AI Review
+            </button>
+          )}
           {view === "planner" && canWrite && (
             <button onClick={resetProgram} className="btn py-1.5 px-3 text-[12px]">
               Reset to default
@@ -180,6 +190,16 @@ export default function FlowPage() {
           beatId={selected}
           view={view}
           onClose={() => setSelected(null)}
+        />
+      )}
+
+      {reviewOpen && (
+        <RunOfShowReviewModal
+          onClose={() => setReviewOpen(false)}
+          onJumpToBeat={(beatId) => {
+            setReviewOpen(false);
+            setSelected(beatId);
+          }}
         />
       )}
     </div>
@@ -368,6 +388,7 @@ function BeatDrawer({
   const removeRefVideo = useDeck((s) => s.removeRefVideo);
   const addCustomAct = useDeck((s) => s.addCustomAct);
   const addTalent = useDeck((s) => s.addTalent);
+  const draftBeatText = useDeck((s) => s.draftBeatText);
   const myRole = useDeck((s) => s.myRole);
   const canWrite = myRole === "owner" || myRole === "editor";
 
@@ -378,6 +399,8 @@ function BeatDrawer({
   const [newVideoUrl, setNewVideoUrl] = useState("");
   const [newItemKind, setNewItemKind] = useState<"show" | "decor" | null>(null);
   const [newTalentOpen, setNewTalentOpen] = useState(false);
+  const [draftingWhat, setDraftingWhat] = useState(false);
+  const [draftError, setDraftError] = useState("");
 
   if (!beat) return null; // deleted mid-edit
 
@@ -549,12 +572,35 @@ function BeatDrawer({
                 className="w-full"
               />
             </Field>
-            <Field label="What happens">
+            <label className="block">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">
+                  What happens
+                </span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setDraftingWhat(true);
+                    setDraftError("");
+                    const result = await draftBeatText(PROJECT_SLUG, beat.id);
+                    if (result.ok && result.draft) {
+                      updateProgramBeat(beat.id, { what: result.draft });
+                    } else {
+                      setDraftError(result.error ?? "Draft failed.");
+                    }
+                    setDraftingWhat(false);
+                  }}
+                  disabled={draftingWhat}
+                  className="text-[11px] emerald-text hover:underline disabled:opacity-60"
+                >
+                  {draftingWhat ? "Drafting…" : "✨ Draft with AI"}
+                </button>
+              </div>
               <textarea
                 value={beat.what}
                 onChange={(e) => updateProgramBeat(beat.id, { what: e.target.value })}
                 rows={3}
-                className="w-full text-[13px]"
+                className="w-full text-[13px] mt-1"
                 style={{
                   background: "var(--bg-soft)",
                   border: "1px solid var(--border)",
@@ -564,7 +610,12 @@ function BeatDrawer({
                   resize: "vertical",
                 }}
               />
-            </Field>
+              {draftError && (
+                <p className="text-[11px] mt-1" style={{ color: "var(--danger)" }}>
+                  {draftError}
+                </p>
+              )}
+            </label>
             <Field
               label={
                 linkedActs.length > 0

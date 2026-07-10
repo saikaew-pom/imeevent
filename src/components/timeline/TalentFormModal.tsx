@@ -28,6 +28,24 @@ export function TalentFormModal({
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [draftingDesc, setDraftingDesc] = useState(false);
+
+  const draftItemDescription = useDeck((s) => s.draftItemDescription);
+
+  const handleDraftDescription = async () => {
+    if (!name.trim()) return;
+    setDraftingDesc(true);
+    setError("");
+    const result = await draftItemDescription(PROJECT_SLUG, {
+      kind: "talent",
+      name,
+      subtitle: role || undefined,
+      photoUrl: photoUrl && !photoUrl.startsWith("blob:") ? photoUrl : undefined,
+    });
+    if (result.ok && result.draft) setDescription(result.draft);
+    else setError(result.error ?? "AI drafting failed.");
+    setDraftingDesc(false);
+  };
 
   const handlePhotoFile = async (file: File) => {
     setError("");
@@ -105,12 +123,25 @@ export function TalentFormModal({
               className="w-full"
             />
           </Field>
-          <Field label="Description">
+          <label className="block">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">
+                Description
+              </span>
+              <button
+                type="button"
+                onClick={handleDraftDescription}
+                disabled={draftingDesc || !name.trim()}
+                className="text-[11px] emerald-text hover:underline disabled:opacity-60"
+              >
+                {draftingDesc ? "Drafting…" : "✨ Draft with AI"}
+              </button>
+            </div>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              className="w-full text-[13px]"
+              className="w-full text-[13px] mt-1"
               style={{
                 background: "var(--bg-soft)",
                 border: "1px solid var(--border)",
@@ -120,7 +151,7 @@ export function TalentFormModal({
                 resize: "vertical",
               }}
             />
-          </Field>
+          </label>
 
           <Field label="Photo">
             <div className="flex items-center gap-3">

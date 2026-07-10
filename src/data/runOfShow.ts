@@ -33,6 +33,15 @@ export interface Beat {
   custom?: boolean; // true if added by the user in the planner (not the original run of show)
 }
 
+export type FindingSeverity = "risk" | "gap" | "tip";
+
+export interface ReviewFinding {
+  severity: FindingSeverity;
+  beatId: string | null; // null when the finding is about the timeline as a whole
+  title: string;
+  detail: string;
+}
+
 // Real event media captured at prior JW NYE galas (compressed for web).
 const img = (name: string, label?: string): MediaItem => ({
   type: "image",

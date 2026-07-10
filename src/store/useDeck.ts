@@ -6,7 +6,7 @@ import { Placement, ThemeKey, Act, NewActInput } from "@/data/acts";
 import { VibeLevel } from "@/data/presets";
 import { defaultFinancials, FinancialAssumptions, PackageTier } from "@/data/financials";
 import { CostGroupKey } from "@/data/costStructure";
-import { runOfShow, Beat, MediaItem } from "@/data/runOfShow";
+import { runOfShow, Beat, MediaItem, ReviewFinding } from "@/data/runOfShow";
 import { Slide } from "@/data/slides";
 import { ProjectTask, NewTaskInput, ProjectMember } from "@/data/tasks";
 import { ProjectDocument, NewDocumentInput, SuggestedTask } from "@/data/documents";
@@ -195,6 +195,21 @@ interface DeckState {
     input: NewTalentInput
   ) => Promise<{ ok: boolean; error?: string }>;
   removeTalent: (slug: string, id: string) => Promise<{ ok: boolean; error?: string }>;
+
+  // AI content assist — drafts beat text / item descriptions, and reviews the
+  // whole run of show for gaps/risks. None of these persist anything; the
+  // caller applies (or discards) the returned draft itself.
+  draftBeatText: (
+    slug: string,
+    beatId: string
+  ) => Promise<{ ok: boolean; draft?: string; error?: string }>;
+  draftItemDescription: (
+    slug: string,
+    input: { kind: "show" | "decor" | "talent"; name: string; subtitle?: string; photoUrl?: string }
+  ) => Promise<{ ok: boolean; draft?: string; error?: string }>;
+  reviewRunOfShow: (
+    slug: string
+  ) => Promise<{ ok: boolean; findings?: ReviewFinding[]; error?: string }>;
 }
 
 export const useDeck = create<DeckState>()(
@@ -904,6 +919,45 @@ export const useDeck = create<DeckState>()(
             return { ok: true };
           } catch (e) {
             return { ok: false, error: e instanceof Error ? e.message : "Failed to remove talent." };
+          }
+        },
+
+        draftBeatText: async (slug, beatId) => {
+          try {
+            const data = await apiJson<{ draft: string }>("/api/builder/ai/beat-draft", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug, beatId }),
+            });
+            return { ok: true, draft: data.draft };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "AI drafting failed." };
+          }
+        },
+
+        draftItemDescription: async (slug, input) => {
+          try {
+            const data = await apiJson<{ draft: string }>("/api/builder/ai/item-draft", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug, ...input }),
+            });
+            return { ok: true, draft: data.draft };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "AI drafting failed." };
+          }
+        },
+
+        reviewRunOfShow: async (slug) => {
+          try {
+            const data = await apiJson<{ findings: ReviewFinding[] }>("/api/builder/ai/review", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug }),
+            });
+            return { ok: true, findings: data.findings };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "AI review failed." };
           }
         },
       };
