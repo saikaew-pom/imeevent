@@ -255,7 +255,7 @@ export default function PresentPage() {
       {/* Controls */}
       <div className="flex items-center justify-between px-6 py-4 border-t hairline">
         <div className="flex items-center gap-2">
-          <Link href="/" className="btn py-1.5 px-3 text-[12px]">
+          <Link href="/dashboard" className="btn py-1.5 px-3 text-[12px]">
             ✕ Exit
           </Link>
           <button
