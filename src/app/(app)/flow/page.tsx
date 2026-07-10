@@ -228,6 +228,16 @@ function BeatRow({
     .filter((a): a is Act => Boolean(a));
   const hasDropdown = linkedActs.length > 0 || (beat.gallery && beat.gallery.length > 0);
 
+  const firstGalleryItem = beat.gallery?.[0];
+  const thumbSrc =
+    beat.media?.photo ??
+    (firstGalleryItem
+      ? firstGalleryItem.type === "image"
+        ? firstGalleryItem.src
+        : firstGalleryItem.poster
+      : undefined);
+  const thumbIsVideo = !beat.media?.photo && firstGalleryItem?.type === "video";
+
   return (
     <div
       className="panel overflow-hidden transition-colors"
@@ -249,6 +259,20 @@ function BeatRow({
           className="w-1 self-stretch rounded-full shrink-0"
           style={{ background: color, opacity: 0.8 }}
         />
+        {thumbSrc && (
+          <div className="relative hidden sm:block w-12 h-12 md:w-14 md:h-14 rounded-md overflow-hidden shrink-0 border hairline">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={thumbSrc} alt="" className="w-full h-full object-cover" />
+            {thumbIsVideo && (
+              <div
+                className="absolute inset-0 flex items-center justify-center"
+                style={{ background: "rgba(0,0,0,0.35)" }}
+              >
+                <span style={{ fontSize: 13, color: "#fff" }}>▶</span>
+              </div>
+            )}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-[14px] truncate">{beat.segment}</span>
