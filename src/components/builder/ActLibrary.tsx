@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Act,
   ThemeKey,
@@ -40,6 +41,7 @@ export function ActLibrary() {
   const [placeFilter, setPlaceFilter] = useState<Placement | "all">("all");
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Act | null>(null);
+  const [viewing, setViewing] = useState<Act | null>(null);
   const [error, setError] = useState("");
 
   const all = useMemo(() => allActsList(customActs), [customActs]);
@@ -165,6 +167,7 @@ export function ActLibrary() {
             key={a.id}
             act={a}
             onAdd={canWrite ? (slot) => addAct(slot, a.id) : undefined}
+            onView={() => setViewing(a)}
             onEdit={
               canWrite
                 ? () => {
@@ -194,6 +197,8 @@ export function ActLibrary() {
           onSubmit={submitForm}
         />
       )}
+
+      {viewing && <ActPhotoModal act={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 }
@@ -201,12 +206,14 @@ export function ActLibrary() {
 function ActCard({
   act,
   onAdd,
+  onView,
   onEdit,
   onRemove,
   removeLabel = "✕",
 }: {
   act: Act;
   onAdd?: (slot: Placement) => void;
+  onView: () => void;
   onEdit?: () => void;
   onRemove?: () => void;
   removeLabel?: string;
@@ -214,7 +221,19 @@ function ActCard({
   const isShow = act.kind === "show";
   return (
     <div className="panel-2 overflow-hidden group flex flex-col">
-      <div className="relative h-28 overflow-hidden">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onView}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onView();
+          }
+        }}
+        title="View photo & description"
+        className="relative h-28 overflow-hidden cursor-pointer"
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={act.photo}
@@ -315,5 +334,41 @@ function ActCard({
         )}
       </div>
     </div>
+  );
+}
+
+function ActPhotoModal({ act, onClose }: { act: Act; onClose: () => void }) {
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[85] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.85)" }}
+      onClick={onClose}
+    >
+      <button onClick={onClose} className="absolute top-4 right-4 btn px-3 py-1.5 z-10">
+        ✕
+      </button>
+      <div
+        className="max-w-2xl w-full max-h-[85vh] overflow-y-auto flex flex-col items-center fade-up"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={act.photo}
+          alt={act.name}
+          className="max-h-[60vh] w-auto rounded-xl border hairline"
+        />
+        <div className="panel px-5 py-4 mt-3 w-full">
+          <h3 className="text-lg font-semibold gold-text mb-1">{act.name}</h3>
+          <p className="text-[12px] text-[var(--text-faint)] mb-2">
+            {act.type}
+            {act.kind === "show" && act.energy !== undefined && ` · energy ${act.energy}/10`}
+          </p>
+          <p className="text-[13.5px] text-[var(--text-dim)] leading-relaxed">
+            {act.description || "No description yet."}
+          </p>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
