@@ -11,8 +11,10 @@ import { HoverCard, InfoDot } from "@/components/HoverCard";
 import { ExportSaveButtons } from "@/components/ExportSaveButtons";
 import { thb, thbShort, pct } from "@/lib/format";
 import Link from "next/link";
+import { useProjectSlug } from "@/components/ProjectProvider";
 
 export default function CostingPage() {
+  const base = `/p/${useProjectSlug()}`;
   const contentRef = useRef<HTMLDivElement>(null);
   const financials = useDeck((s) => s.financials);
   const setTier = useDeck((s) => s.setTier);
@@ -47,7 +49,7 @@ export default function CostingPage() {
           </p>
         </div>
         <div className="flex gap-2" data-export-hide>
-          <Link href="/revenue" className="btn">
+          <Link href={`${base}/revenue`} className="btn">
             ← Summary
           </Link>
           {canWrite && (
@@ -184,7 +186,7 @@ export default function CostingPage() {
                       {showActs > 0 ? thb(showActs) : "—"}
                     </span>
                     <Link
-                      href="/builder"
+                      href={`${base}/builder`}
                       className="text-[11px] emerald-text text-center hover:underline"
                       title="Edit lineup"
                     >

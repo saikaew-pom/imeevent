@@ -6,7 +6,14 @@ import { Placement, ThemeKey, Act, NewActInput } from "@/data/acts";
 import { VibeLevel } from "@/data/presets";
 import { defaultFinancials, FinancialAssumptions, PackageTier } from "@/data/financials";
 import { CostGroupKey } from "@/data/costStructure";
-import { runOfShow, Beat, MediaItem, ReviewFinding } from "@/data/runOfShow";
+import {
+  runOfShow,
+  Beat,
+  MediaItem,
+  ReviewFinding,
+  EventMeta,
+  EMPTY_EVENT_META,
+} from "@/data/runOfShow";
 import { Slide } from "@/data/slides";
 import { ProjectTask, NewTaskInput, ProjectMember } from "@/data/tasks";
 import { ProjectDocument, NewDocumentInput, SuggestedTask } from "@/data/documents";
@@ -45,7 +52,7 @@ const MEDIA_CHUNK_BYTES = 8 * 1024 * 1024; // 8MB
 // Lineup/program/financials are shared project state (D1-backed) but change
 // on every keystroke (cost line inputs, drag reorders, etc), so we push each
 // key to the server on a short debounce instead of one request per edit.
-type StateKey = "lineup" | "program" | "financials" | "presentation" | "hiddenSlides";
+type StateKey = "lineup" | "program" | "financials" | "presentation" | "hiddenSlides" | "meta";
 const persistTimers: Partial<Record<StateKey, ReturnType<typeof setTimeout>>> = {};
 
 function schedulePersist(slug: string | null, key: StateKey, data: unknown) {
@@ -73,6 +80,7 @@ interface DeckState {
   projectSlug: string | null;
   sharedStateLoaded: boolean;
   program: Beat[];
+  meta: EventMeta; // per-project event branding (venue, date, concept, …)
   presentation: Slide[];
   slideGenerating: string | null; // beatId currently being generated, if any
   slideBatchProgress: { current: number; total: number } | null;
@@ -127,6 +135,7 @@ interface DeckState {
   // fetches the saved copy (if any) and remembers the slug so every
   // mutating action below can push its own debounced update.
   hydrateSharedState: (slug: string) => Promise<void>;
+  updateEventMeta: (patch: Partial<EventMeta>) => void;
 
   addProgramBeat: () => string;
   updateProgramBeat: (id: string, patch: Partial<Beat>) => void;
@@ -257,6 +266,7 @@ export const useDeck = create<DeckState>()(
         schedulePersist(get().projectSlug, "presentation", get().presentation);
       const persistHiddenSlides = () =>
         schedulePersist(get().projectSlug, "hiddenSlides", get().hiddenSlides);
+      const persistMeta = () => schedulePersist(get().projectSlug, "meta", get().meta);
 
       return {
         lineup: [],
@@ -270,6 +280,7 @@ export const useDeck = create<DeckState>()(
         projectSlug: null,
         sharedStateLoaded: false,
         program: runOfShow.map((b) => ({ ...b })),
+        meta: { ...EMPTY_EVENT_META },
         presentation: [],
         slideGenerating: null,
         slideBatchProgress: null,
@@ -522,6 +533,12 @@ export const useDeck = create<DeckState>()(
         },
 
         hydrateSharedState: async (slug) => {
+          // Reset every shared key to the project's own value, falling back to
+          // the blank-slate defaults when a project has no saved state. This
+          // MUST fully replace (not merge) so switching between projects never
+          // leaves one project's lineup/program/financials showing under
+          // another — a new project starts with an empty run of show and
+          // lineup, default financials, and no slides.
           try {
             const data = await apiJson<{
               role: ProjectRole;
@@ -530,20 +547,37 @@ export const useDeck = create<DeckState>()(
               financials: FinancialAssumptions | null;
               presentation: Slide[] | null;
               hiddenSlides: string[] | null;
+              meta: EventMeta | null;
             }>(`/api/builder/state?slug=${encodeURIComponent(slug)}`);
             set({
               projectSlug: slug,
               myRole: data.role,
               sharedStateLoaded: true,
-              ...(data.lineup !== null ? { lineup: data.lineup } : {}),
-              ...(data.program !== null ? { program: data.program } : {}),
-              ...(data.financials !== null ? { financials: data.financials } : {}),
-              ...(data.presentation !== null ? { presentation: data.presentation } : {}),
-              ...(data.hiddenSlides !== null ? { hiddenSlides: data.hiddenSlides } : {}),
+              lineup: data.lineup ?? [],
+              program: data.program ?? [],
+              financials: data.financials ?? { ...defaultFinancials },
+              presentation: data.presentation ?? [],
+              hiddenSlides: data.hiddenSlides ?? [],
+              meta: { ...EMPTY_EVENT_META, ...(data.meta ?? {}) },
             });
           } catch {
-            set({ projectSlug: slug, sharedStateLoaded: true });
+            set({
+              projectSlug: slug,
+              sharedStateLoaded: true,
+              lineup: [],
+              program: [],
+              financials: { ...defaultFinancials },
+              presentation: [],
+              hiddenSlides: [],
+              meta: { ...EMPTY_EVENT_META },
+            });
           }
+        },
+
+        updateEventMeta: (patch) => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => ({ meta: { ...s.meta, ...patch } }));
+          persistMeta();
         },
 
         addProgramBeat: () => {
@@ -1185,6 +1219,7 @@ export const useDeck = create<DeckState>()(
           sharedStateLoaded,
           lineup,
           program,
+          meta,
           financials,
           presentation,
           slideGenerating,
@@ -1209,6 +1244,7 @@ export const useDeck = create<DeckState>()(
         void sharedStateLoaded;
         void lineup;
         void program;
+        void meta;
         void financials;
         void presentation;
         void slideGenerating;

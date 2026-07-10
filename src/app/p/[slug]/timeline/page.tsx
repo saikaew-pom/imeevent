@@ -16,8 +16,8 @@ import { PresetPickerModal } from "@/components/timeline/PresetPickerModal";
 import { AddDocumentModal } from "@/components/timeline/AddDocumentModal";
 import { SuggestionsModal } from "@/components/timeline/SuggestionsModal";
 import { SuggestedTask } from "@/data/documents";
+import { useProjectSlug } from "@/components/ProjectProvider";
 
-const PROJECT_SLUG = "jw-gala-garden-night";
 const ALL_CATEGORIES = Object.keys(CATEGORY_LABELS) as TaskCategory[];
 
 function daysUntil(eventDate: string | null): number | null {
@@ -41,6 +41,7 @@ export default function TimelinePage() {
   const suggestTasks = useDeck((s) => s.suggestTasks);
   const acceptSuggestions = useDeck((s) => s.acceptSuggestions);
   const canWrite = myRole === "owner" || myRole === "editor";
+  const PROJECT_SLUG = useProjectSlug();
 
   const [view, setView] = useState<"checklist" | "gantt">("checklist");
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all");

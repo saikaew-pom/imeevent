@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSessionUser } from "@/lib/auth/session";
 import {
   createUser,
+  createProject,
   deleteUser,
   addProjectMember,
   removeProjectMember,
@@ -36,6 +37,15 @@ export async function createUserAction(formData: FormData) {
   }
 
   await createUser({ email, name, password, isAdmin });
+  revalidatePath("/admin");
+}
+
+export async function createProjectAction(formData: FormData) {
+  const admin = await requireAdmin();
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) throw new Error("A project name is required.");
+  // The admin becomes the initial owner; they can reassign ownership below.
+  await createProject({ name, ownerId: admin.id });
   revalidatePath("/admin");
 }
 

@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { Slide } from "@/data/slides";
-
-const PROJECT_SLUG = "jw-gala-garden-night";
+import { useProjectSlug } from "@/components/ProjectProvider";
 
 export function SlideEditorModal({
   initial,
@@ -16,6 +15,7 @@ export function SlideEditorModal({
   onSave: (patch: Partial<Slide>) => void;
   hidePhoto?: boolean;
 }) {
+  const PROJECT_SLUG = useProjectSlug();
   const [title, setTitle] = useState(initial.title);
   const [subtitle, setSubtitle] = useState(initial.subtitle);
   const [body, setBody] = useState(initial.body);

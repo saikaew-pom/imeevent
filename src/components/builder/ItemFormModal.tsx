@@ -12,10 +12,10 @@ import {
   THEME_LABELS,
 } from "@/data/acts";
 import { useDeck } from "@/store/useDeck";
+import { useProjectSlug } from "@/components/ProjectProvider";
 
 const ALL_THEMES = Object.keys(THEME_LABELS) as ThemeKey[];
 const ALL_PLACEMENTS = Object.keys(PLACEMENT_LABELS) as Placement[];
-const PROJECT_SLUG = "jw-gala-garden-night";
 
 export function ItemFormModal({
   initial,
@@ -29,6 +29,7 @@ export function ItemFormModal({
   onSubmit: (input: NewActInput) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const draftItemDescription = useDeck((s) => s.draftItemDescription);
+  const PROJECT_SLUG = useProjectSlug();
 
   const [kind, setKind] = useState<ItemKind>(initial?.kind ?? defaultKind ?? "show");
   const [name, setName] = useState(initial?.name ?? "");

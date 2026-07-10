@@ -1,12 +1,12 @@
 import "server-only";
-import { Beat, eventMeta } from "@/data/runOfShow";
+import { Beat, EventMeta } from "@/data/runOfShow";
 import { Act, findAct, Placement, PLACEHOLDER_PHOTO } from "@/data/acts";
 import { Slide } from "@/data/slides";
 import { generateSlideCopy, generateSlideImage } from "@/lib/ai/minimax";
 import { getPhotosBucket } from "@/lib/cf";
 import { FinancialAssumptions } from "@/data/financials";
 import { computePnL } from "@/lib/pnl";
-import { finaleConcepts, goldenBloom } from "@/data/finale";
+import { finaleConcepts } from "@/data/finale";
 import { thb, pct } from "@/lib/format";
 
 interface SlideCopy {
@@ -129,6 +129,8 @@ function orderActs(lineup: LineupItemLike[], custom: Act[]): Act[] {
 }
 
 export interface StaticSlideContext {
+  title: string; // the project's display name
+  meta: EventMeta;
   program: Beat[];
   lineup: LineupItemLike[];
   customActs: Act[];
@@ -136,17 +138,26 @@ export interface StaticSlideContext {
 }
 
 function buildStaticPrompt(key: StaticSlideKey, ctx: StaticSlideContext): string {
-  const intro = `You are writing one slide of a client-facing run-of-show presentation for "${eventMeta.title}" at ${eventMeta.venue}, ${eventMeta.date}.`;
+  const where = ctx.meta.venue ? ` at ${ctx.meta.venue}` : "";
+  const when = ctx.meta.date ? `, ${ctx.meta.date}` : "";
+  const intro = `You are writing one slide of a client-facing run-of-show presentation for "${ctx.title}"${where}${when}.`;
   const responseSpec = `Respond with ONLY a JSON object, no markdown fences, in exactly this shape:
 {"title": "short punchy slide title (max 8 words)", "subtitle": "one-line descriptor (max 14 words, or empty string if not needed)", "body": "1-3 sentences of client-facing narrative, max 60 words"}`;
 
   switch (key) {
     case "title": {
-      return `${intro}\n\nThis is the OPENING title slide. Event: ${eventMeta.date} · ${eventMeta.timing}. Guests: ${eventMeta.guests}. Theme: ${eventMeta.theme}.\n\nWrite an evocative event title (replacing "JW Gala Garden Night" if you can do better) and a short elegant tagline as the subtitle. Body should be a one-sentence flourish setting the mood, or empty.\n\n${responseSpec}`;
+      const facts = [
+        [ctx.meta.date, ctx.meta.timing].filter(Boolean).join(" · "),
+        ctx.meta.guests ? `Guests: ${ctx.meta.guests}` : "",
+        ctx.meta.theme ? `Theme: ${ctx.meta.theme}` : "",
+      ]
+        .filter(Boolean)
+        .join(". ");
+      return `${intro}\n\nThis is the OPENING title slide.${facts ? ` ${facts}.` : ""}\n\nWrite an evocative event title (you may improve on "${ctx.title}") and a short elegant tagline as the subtitle. Body should be a one-sentence flourish setting the mood, or empty.\n\n${responseSpec}`;
     }
     case "flow": {
       const segments = ctx.program.map((b) => `${b.time} ${b.segment}`).join(", ");
-      return `${intro}\n\nThis is the CONCEPT/FLOW slide explaining the shape of the night. Existing concept notes: "${eventMeta.concept}"\nProgram beats in order: ${segments}\n\nWrite a title capturing the night's arc, and body copy (can rework the concept notes) explaining how energy builds across the night.\n\n${responseSpec}`;
+      return `${intro}\n\nThis is the CONCEPT/FLOW slide explaining the shape of the night. Existing concept notes: "${ctx.meta.concept || "(none yet)"}"\nProgram beats in order: ${segments || "(none yet)"}\n\nWrite a title capturing the night's arc, and body copy (can rework the concept notes) explaining how energy builds across the night.\n\n${responseSpec}`;
     }
     case "lineup": {
       const acts = orderActs(ctx.lineup, ctx.customActs);
@@ -157,7 +168,7 @@ function buildStaticPrompt(key: StaticSlideKey, ctx: StaticSlideContext): string
       return `${intro}\n\nThis is the LINEUP slide. Booked acts, in running order:\n${actLines}\nTotal stage time: ${totalDuration} min across ${acts.length} acts.\n\nWrite a title and short body copy introducing the show lineup as a client would see it (do not restate every act name in the body — the chips do that already).\n\n${responseSpec}`;
     }
     case "finale": {
-      return `${intro}\n\nThis is the FINALE slide, spotlighting the closing production number "${goldenBloom.title}". Existing creative brief: "${goldenBloom.concept}"\n\nWrite a punchy title (can rework "${goldenBloom.title}"), a subtitle, and body copy pitching the finale to the client (can rework the creative brief).\n\n${responseSpec}`;
+      return `${intro}\n\nThis is the FINALE slide, spotlighting the closing moment of the event.\n\nWrite a punchy title, a subtitle, and body copy pitching the finale to the client.\n\n${responseSpec}`;
     }
     case "numbers": {
       const pnl = computePnL(ctx.financials, orderActs(ctx.lineup, ctx.customActs).reduce((s, a) => s + a.costTHB, 0));
@@ -166,13 +177,20 @@ function buildStaticPrompt(key: StaticSlideKey, ctx: StaticSlideContext): string
   }
 }
 
-const STATIC_SLIDE_FALLBACK_TITLE: Record<StaticSlideKey, string> = {
-  title: eventMeta.title,
-  flow: "One rising curve, four peaks",
-  lineup: "The lineup",
-  finale: goldenBloom.title,
-  numbers: "Revenue model at a glance",
-};
+function staticFallbackTitle(key: StaticSlideKey, ctx: StaticSlideContext): string {
+  switch (key) {
+    case "title":
+      return ctx.title;
+    case "flow":
+      return "The shape of the night";
+    case "lineup":
+      return "The lineup";
+    case "finale":
+      return "The finale";
+    case "numbers":
+      return "Revenue model at a glance";
+  }
+}
 
 // Generates (or regenerates) one of the 5 static (non-beat) slides.
 export async function generateSlideForStatic(
@@ -181,7 +199,7 @@ export async function generateSlideForStatic(
 ): Promise<Slide> {
   const prompt = buildStaticPrompt(key, ctx);
   const copyRaw = await generateSlideCopy(prompt);
-  const copy = parseSlideCopy(copyRaw, STATIC_SLIDE_FALLBACK_TITLE[key]);
+  const copy = parseSlideCopy(copyRaw, staticFallbackTitle(key, ctx));
 
   const imageUrl = key === "finale" ? finaleConcepts[1].image : undefined;
 

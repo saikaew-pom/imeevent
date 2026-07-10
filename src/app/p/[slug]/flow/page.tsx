@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { eventMeta, whySpacingWorks, Beat } from "@/data/runOfShow";
+import { whySpacingWorks, Beat } from "@/data/runOfShow";
 import { VIDEO_PLACEHOLDER_POSTER } from "@/data/media";
 import { allActsList, findAct, Act, NewActInput } from "@/data/acts";
 import { Talent, NewTalentInput } from "@/data/talent";
@@ -32,8 +32,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-
-const PROJECT_SLUG = "jw-gala-garden-night";
+import { useProjectSlug } from "@/components/ProjectProvider";
 
 const peakLabels: Record<string, string> = {
   peak1: "Peak 1",
@@ -62,8 +61,10 @@ export default function FlowPage() {
   const resetProgram = useDeck((s) => s.resetProgram);
   const removeProgramBeat = useDeck((s) => s.removeProgramBeat);
   const reorderProgram = useDeck((s) => s.reorderProgram);
+  const meta = useDeck((s) => s.meta);
   const myRole = useDeck((s) => s.myRole);
   const canWrite = myRole === "owner" || myRole === "editor";
+  const headerMeta = [meta.date, meta.timing].filter(Boolean).join(" · ");
 
   const moveBeat = (index: number, dir: -1 | 1) => {
     const target = index + dir;
@@ -117,7 +118,7 @@ export default function FlowPage() {
             Event Flow
           </h1>
           <p className="text-[13px] text-[var(--text-dim)] mt-1">
-            {eventMeta.date} · {eventMeta.timing} · one rising curve, four peaks
+            {headerMeta ? `${headerMeta} · ` : ""}the run of show as one rising energy curve
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -589,6 +590,7 @@ function BeatDrawer({
   const draftBeatText = useDeck((s) => s.draftBeatText);
   const myRole = useDeck((s) => s.myRole);
   const canWrite = myRole === "owner" || myRole === "editor";
+  const PROJECT_SLUG = useProjectSlug();
 
   const [addingActId, setAddingActId] = useState("");
   const [addingDecorId, setAddingDecorId] = useState("");

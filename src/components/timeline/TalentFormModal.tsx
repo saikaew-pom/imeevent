@@ -4,8 +4,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useDeck } from "@/store/useDeck";
 import { Talent, NewTalentInput } from "@/data/talent";
-
-const PROJECT_SLUG = "jw-gala-garden-night";
+import { useProjectSlug } from "@/components/ProjectProvider";
 
 export function TalentFormModal({
   initial,
@@ -17,6 +16,7 @@ export function TalentFormModal({
   onSubmit: (input: NewTalentInput) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const uploadMediaAsset = useDeck((s) => s.uploadMediaAsset);
+  const PROJECT_SLUG = useProjectSlug();
 
   const [name, setName] = useState(initial?.name ?? "");
   const [role, setRole] = useState(initial?.role ?? "");

@@ -16,8 +16,7 @@ import { useDeck } from "@/store/useDeck";
 import { EnergyDots } from "@/components/EnergyBadge";
 import { thbShort } from "@/lib/format";
 import { ItemFormModal } from "./ItemFormModal";
-
-const PROJECT_SLUG = "jw-gala-garden-night";
+import { useProjectSlug } from "@/components/ProjectProvider";
 
 const slotShort: Record<Placement, string> = {
   welcome: "W",
@@ -34,6 +33,7 @@ export function ActLibrary() {
   const updateCustomAct = useDeck((s) => s.updateCustomAct);
   const removeCustomAct = useDeck((s) => s.removeCustomAct);
   const canWrite = myRole === "owner" || myRole === "editor";
+  const PROJECT_SLUG = useProjectSlug();
 
   const [q, setQ] = useState("");
   const [kindTab, setKindTab] = useState<ItemKind | "all">("all");

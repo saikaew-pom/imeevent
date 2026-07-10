@@ -1,31 +1,36 @@
+"use client";
+
 import Link from "next/link";
-import { eventMeta } from "@/data/runOfShow";
+import { useState } from "react";
 import { acts } from "@/data/acts";
+import { useDeck } from "@/store/useDeck";
+import { useProject } from "@/components/ProjectProvider";
+import { EventSettingsModal } from "@/components/dashboard/EventSettingsModal";
 
 const modules = [
   {
-    href: "/flow",
+    seg: "flow",
     tag: "01",
     title: "Event Flow",
     body: "The full run of show as a live energy curve — click any beat for cues, linked visuals and video slots. Planner and client views.",
     accent: "var(--emerald-bright)",
   },
   {
-    href: "/builder",
+    seg: "builder",
     tag: "02",
     title: "Show & Decor Builder",
     body: "Add your own shows or decor, pick acts into Welcome / Opening / Mid / Finale slots, and link them straight into Event Flow. The vibe graph redraws live.",
     accent: "var(--gold-bright)",
   },
   {
-    href: "/revenue",
+    seg: "revenue",
     tag: "03",
     title: "Revenue vs Costing",
     body: "P&L with editable assumptions. Your built lineup's talent cost flows straight into the model — margin, break-even and scenario compare.",
     accent: "var(--emerald-bright)",
   },
   {
-    href: "/media",
+    seg: "media",
     tag: "04",
     title: "Media Library",
     body: "Every photo, video, song and reference link uploaded anywhere in the project, searchable in one place — rename, sort by type, and reuse without re-uploading.",
@@ -33,14 +38,20 @@ const modules = [
   },
 ];
 
-const snapshot = [
-  ["Date", eventMeta.date],
-  ["Timing", eventMeta.timing],
-  ["Guests", eventMeta.guests],
-  ["Spaces", eventMeta.spaces],
-];
-
 export default function Home() {
+  const { slug, name, role } = useProject();
+  const meta = useDeck((s) => s.meta);
+  const canWrite = role === "owner" || role === "editor";
+  const [editing, setEditing] = useState(false);
+  const base = `/p/${slug}`;
+
+  const snapshot: [string, string][] = [
+    ["Date", meta.date],
+    ["Timing", meta.timing],
+    ["Guests", meta.guests],
+    ["Spaces", meta.spaces],
+  ];
+
   return (
     <div className="mx-auto max-w-[1400px] px-5 py-10">
       {/* Hero */}
@@ -53,20 +64,30 @@ export default function Home() {
           }}
         />
         <div className="relative">
-          <div className="chip mb-5">JW Marriott Phuket Resort &amp; Spa · NYE 2026</div>
-          <h1 className="font-display italic text-4xl md:text-6xl leading-[1.05] mb-4">
-            <span className="gold-gradient">JW Gala Garden Night</span>
-          </h1>
+          {meta.venue && <div className="chip mb-5">{meta.venue}</div>}
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <h1 className="font-display italic text-4xl md:text-6xl leading-[1.05]">
+              <span className="gold-gradient">{name}</span>
+            </h1>
+            {canWrite && (
+              <button
+                onClick={() => setEditing(true)}
+                className="btn py-1.5 px-3 text-[12px] shrink-0"
+              >
+                ✎ Edit event details
+              </button>
+            )}
+          </div>
           <p className="text-[15px] md:text-lg text-[var(--text-dim)] max-w-2xl leading-relaxed">
-            An interactive command deck for the New Year&apos;s Eve gala — design the
-            show, shape the night&apos;s energy, and model the numbers, all from your
-            real run of show and a {acts.length}-act entertainment catalogue.
+            An interactive command deck for your event — design the show, shape the
+            night&apos;s energy, and model the numbers, all from your run of show and a{" "}
+            {acts.length}-act entertainment catalogue.
           </p>
           <div className="flex flex-wrap gap-3 mt-8">
-            <Link href="/builder" className="btn btn-gold">
+            <Link href={`${base}/builder`} className="btn btn-gold">
               Open the Show &amp; Decor Builder
             </Link>
-            <Link href="/present" className="btn">
+            <Link href={`${base}/present`} className="btn">
               ▸ Enter present mode
             </Link>
           </div>
@@ -80,30 +101,35 @@ export default function Home() {
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">
               {k}
             </div>
-            <div className="text-[13px] text-[var(--text)] leading-snug">{v}</div>
+            <div className="text-[13px] text-[var(--text)] leading-snug">
+              {v || <span className="text-[var(--text-faint)]">—</span>}
+            </div>
           </div>
         ))}
       </section>
 
       {/* Concept line */}
-      <section className="panel px-7 py-6 mt-3">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="emerald-text text-sm font-semibold">The concept</span>
-          <span className="text-[var(--text-faint)] text-sm">
-            One rising curve, four peaks
-          </span>
-        </div>
-        <p className="text-[14px] text-[var(--text-dim)] leading-relaxed max-w-4xl">
-          {eventMeta.concept}
-        </p>
-      </section>
+      {(meta.concept || canWrite) && (
+        <section className="panel px-7 py-6 mt-3">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="emerald-text text-sm font-semibold">The concept</span>
+          </div>
+          <p className="text-[14px] text-[var(--text-dim)] leading-relaxed max-w-4xl">
+            {meta.concept || (
+              <span className="text-[var(--text-faint)]">
+                Add your event concept in &ldquo;Edit event details&rdquo;.
+              </span>
+            )}
+          </p>
+        </section>
+      )}
 
       {/* Modules */}
       <section className="grid md:grid-cols-2 gap-3 mt-3">
         {modules.map((m) => (
           <Link
-            key={m.href}
-            href={m.href}
+            key={m.seg}
+            href={`${base}/${m.seg}`}
             className="panel px-7 py-6 group hover:border-[var(--gold)] transition-colors"
             style={{ borderColor: "var(--border-soft)" }}
           >
@@ -119,17 +145,16 @@ export default function Home() {
               </span>
             </div>
             <h3 className="text-lg font-semibold mb-1.5">{m.title}</h3>
-            <p className="text-[13px] text-[var(--text-dim)] leading-relaxed">
-              {m.body}
-            </p>
+            <p className="text-[13px] text-[var(--text-dim)] leading-relaxed">{m.body}</p>
           </Link>
         ))}
       </section>
 
       <footer className="text-center text-[12px] text-[var(--text-faint)] mt-10 pb-4">
-        Built from the JW Gala Garden Night run of show &amp; PHOENIX ORGANIZE show
-        catalogue · figures are editable planning estimates
+        Figures are editable planning estimates.
       </footer>
+
+      {editing && <EventSettingsModal onClose={() => setEditing(false)} />}
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useDeck, LineupItem } from "@/store/useDeck";
-import { eventMeta, Beat } from "@/data/runOfShow";
+import { Beat } from "@/data/runOfShow";
 import { EnergyCurve, CurvePoint } from "@/components/EnergyCurve";
 import { curvePoints, lineupTotals, orderedLineup } from "@/lib/analysis";
 import { liveBeatEnergy } from "@/lib/programEnergy";
@@ -13,8 +13,7 @@ import { thb, pct } from "@/lib/format";
 import { findAct, Act, PLACEHOLDER_PHOTO } from "@/data/acts";
 import { Slide as SlideData } from "@/data/slides";
 import { SlideEditorModal } from "@/components/present/SlideEditorModal";
-
-const PROJECT_SLUG = "jw-gala-garden-night";
+import { useProject, useProjectSlug } from "@/components/ProjectProvider";
 
 const EXPORT_WIDTH = 1280;
 const EXPORT_HEIGHT = 720;
@@ -41,6 +40,7 @@ export default function PresentPage() {
   const restoreSlide = useDeck((s) => s.restoreSlide);
   const restoreAllSlides = useDeck((s) => s.restoreAllSlides);
   const canWrite = myRole === "owner" || myRole === "editor";
+  const PROJECT_SLUG = useProjectSlug();
   const [showHidden, setShowHidden] = useState(false);
   const [confirmingRegenerateAll, setConfirmingRegenerateAll] = useState(false);
 
@@ -227,7 +227,7 @@ export default function PresentPage() {
         if (idx > 0) pdf.addPage([EXPORT_WIDTH, EXPORT_HEIGHT], "landscape");
         pdf.addImage(dataUrl, "JPEG", 0, 0, EXPORT_WIDTH, EXPORT_HEIGHT);
       }
-      pdf.save("jw-gala-garden-night-presentation.pdf");
+      pdf.save(`${PROJECT_SLUG}-presentation.pdf`);
     } catch {
       alert("PDF export failed — try again.");
     } finally {
@@ -273,7 +273,7 @@ export default function PresentPage() {
       {/* Controls */}
       <div className="flex items-center justify-between px-6 py-4 border-t hairline">
         <div className="flex items-center gap-2 relative">
-          <Link href="/dashboard" className="btn py-1.5 px-3 text-[12px]">
+          <Link href={`/p/${PROJECT_SLUG}/dashboard`} className="btn py-1.5 px-3 text-[12px]">
             ✕ Exit
           </Link>
           {canWrite && (
@@ -537,23 +537,23 @@ interface StaticSlideProps {
 
 function TitleSlide({ slide, canWrite, generating, onGenerate, onSave, onReset }: StaticSlideProps) {
   const [editing, setEditing] = useState(false);
-  const title = slide?.title || "JW Gala Garden Night";
+  const { name } = useProject();
+  const meta = useDeck((s) => s.meta);
+  const title = slide?.title || name;
+  const line1 = [meta.date, meta.timing].filter(Boolean).join(" · ");
+  const line2 = [meta.guests, meta.theme].filter(Boolean).join(" · ");
 
   return (
     <Slide center>
-      <div className="chip mb-6">{eventMeta.venue} · NYE 2026</div>
+      {meta.venue && <div className="chip mb-6">{meta.venue}</div>}
       <h1 className="font-display italic text-5xl md:text-7xl gold-gradient leading-[1.05] mb-5">
         {title}
       </h1>
       {slide?.subtitle && (
         <p className="text-lg gold-text italic mb-1">{slide.subtitle}</p>
       )}
-      <p className="text-lg text-[var(--text-dim)] max-w-2xl">
-        {eventMeta.date} · {eventMeta.timing}
-      </p>
-      <p className="text-[14px] text-[var(--text-faint)] mt-2">
-        {eventMeta.guests} · {eventMeta.theme}
-      </p>
+      {line1 && <p className="text-lg text-[var(--text-dim)] max-w-2xl">{line1}</p>}
+      {line2 && <p className="text-[14px] text-[var(--text-faint)] mt-2">{line2}</p>}
       {slide?.body && (
         <p className="text-[13px] text-[var(--text-faint)] mt-4 max-w-xl">{slide.body}</p>
       )}
@@ -589,8 +589,9 @@ function ConceptSlide({
   onReset,
 }: StaticSlideProps & { flowPoints: CurvePoint[] }) {
   const [editing, setEditing] = useState(false);
-  const title = slide?.title || "One rising curve, four peaks";
-  const body = slide?.body || eventMeta.concept;
+  const meta = useDeck((s) => s.meta);
+  const title = slide?.title || "The shape of the night";
+  const body = slide?.body || meta.concept;
 
   return (
     <Slide>

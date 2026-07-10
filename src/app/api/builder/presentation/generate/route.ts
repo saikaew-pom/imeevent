@@ -9,7 +9,7 @@ import {
   StaticSlideKey,
   LineupItemLike,
 } from "@/lib/builder/presentation";
-import { Beat, runOfShow } from "@/data/runOfShow";
+import { Beat, runOfShow, EventMeta, EMPTY_EVENT_META } from "@/data/runOfShow";
 import { Slide } from "@/data/slides";
 import { defaultFinancials, FinancialAssumptions } from "@/data/financials";
 
@@ -39,11 +39,14 @@ export async function POST(req: NextRequest) {
     if (!STATIC_SLIDE_KEYS.includes(staticKey as StaticSlideKey)) {
       return NextResponse.json({ error: "Unknown slide." }, { status: 400 });
     }
-    const program = (state.program as Beat[] | null) ?? runOfShow;
+    const program = (state.program as Beat[] | null) ?? [];
     const lineup = (state.lineup as LineupItemLike[] | null) ?? [];
     const financials = (state.financials as FinancialAssumptions | null) ?? defaultFinancials;
+    const meta = (state.meta as EventMeta | null) ?? EMPTY_EVENT_META;
     try {
       slide = await generateSlideForStatic(staticKey as StaticSlideKey, {
+        title: access.project.name,
+        meta,
         program,
         lineup,
         customActs,

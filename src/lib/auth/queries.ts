@@ -24,6 +24,19 @@ function newId(): string {
   return crypto.randomUUID();
 }
 
+// Turn a project name into a URL-safe slug. Empty/symbol-only names fall back
+// to "project" so we always have a non-empty base to uniquify.
+function slugify(name: string): string {
+  const base = name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60)
+    .replace(/-+$/g, "");
+  return base || "project";
+}
+
 export async function getUserByEmail(
   email: string
 ): Promise<(UserRow & { passwordHash: string }) | null> {
@@ -92,6 +105,35 @@ export async function getProjectBySlug(slug: string): Promise<ProjectRow | null>
     .prepare("SELECT id, slug, name, passcode, event_date as eventDate FROM projects WHERE slug = ?")
     .bind(slug)
     .first<ProjectRow>();
+}
+
+// Creates a project from a display name and makes the creator its owner.
+// Derives a unique slug from the name (appending -2, -3, … on collision).
+export async function createProject(input: {
+  name: string;
+  ownerId: string;
+}): Promise<ProjectRow> {
+  const db = await getDB();
+  const name = input.name.trim();
+  const base = slugify(name);
+
+  let slug = base;
+  let n = 1;
+  // Low-concurrency self-serve creation — a check-then-insert loop is enough,
+  // and the UNIQUE constraint on slug is the ultimate backstop.
+  while (await getProjectBySlug(slug)) {
+    n += 1;
+    slug = `${base}-${n}`;
+  }
+
+  const id = newId();
+  await db
+    .prepare("INSERT INTO projects (id, slug, name) VALUES (?, ?, ?)")
+    .bind(id, slug, name)
+    .run();
+  await addProjectMember(id, input.ownerId, "owner");
+
+  return { id, slug, name, passcode: null, eventDate: null };
 }
 
 export async function setProjectEventDate(

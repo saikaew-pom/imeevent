@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { NewDocumentInput } from "@/data/documents";
 import { extractPdfText } from "@/lib/pdf";
-
-const PROJECT_SLUG = "jw-gala-garden-night";
+import { useProjectSlug } from "@/components/ProjectProvider";
 
 type Mode = "file" | "text";
 
@@ -15,6 +14,7 @@ export function AddDocumentModal({
   onClose: () => void;
   onAdd: (input: NewDocumentInput) => Promise<{ ok: boolean; error?: string }>;
 }) {
+  const PROJECT_SLUG = useProjectSlug();
   const [mode, setMode] = useState<Mode>("file");
   const [name, setName] = useState("");
   const [pastedText, setPastedText] = useState("");

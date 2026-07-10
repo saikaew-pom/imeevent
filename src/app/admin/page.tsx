@@ -6,6 +6,7 @@ import { SignOutButton } from "@/components/SignOutButton";
 import { ink, sub, border, hoverBg, danger } from "@/lib/notionTheme";
 import {
   createUserAction,
+  createProjectAction,
   deleteUserAction,
   assignMemberAction,
   removeMemberAction,
@@ -129,6 +130,36 @@ export default async function AdminPage() {
                 </div>
               ))}
           </div>
+        </div>
+
+        {/* Create a project */}
+        <div>
+          <h2 className="text-[16px] font-semibold mb-3">Create a project</h2>
+          <form
+            action={createProjectAction}
+            className="flex items-center gap-2 rounded-[8px] p-4"
+            style={{ border: `1px solid ${border}` }}
+          >
+            <input
+              name="name"
+              placeholder="Project name"
+              required
+              maxLength={80}
+              className="text-[13.5px] rounded-[6px] px-3 py-2 flex-1"
+              style={{ border: `1px solid ${border}` }}
+            />
+            <button
+              type="submit"
+              className="text-[13.5px] font-medium rounded-[6px] px-4 py-2 shrink-0"
+              style={{ background: ink, color: "#fff" }}
+            >
+              Create project
+            </button>
+          </form>
+          <p className="text-[11.5px] mt-2" style={{ color: sub }}>
+            You&apos;ll be set as the owner — reassign it in the project section
+            below.
+          </p>
         </div>
 
         {/* Project assignment */}

@@ -55,6 +55,30 @@ const vid = (name: string, label?: string): MediaItem => ({
   label,
 });
 
+// Per-project event branding. The display title is the project's own `name`
+// (per-project everywhere); these are the descriptive fields, stored as a
+// `meta` key in project_state and edited from the dashboard. A new project
+// starts blank (EMPTY_EVENT_META); JW's values below seed its own record.
+export interface EventMeta {
+  venue: string;
+  date: string; // freeform display date, e.g. "Thursday 31 December 2026"
+  timing: string;
+  guests: string;
+  theme: string;
+  spaces: string;
+  concept: string;
+}
+
+export const EMPTY_EVENT_META: EventMeta = {
+  venue: "",
+  date: "",
+  timing: "",
+  guests: "",
+  theme: "",
+  spaces: "",
+  concept: "",
+};
+
 export const eventMeta = {
   venue: "JW Marriott Phuket Resort & Spa",
   title: "JW Gala Garden Night — New Year's Eve Gala",

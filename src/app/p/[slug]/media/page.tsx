@@ -4,8 +4,7 @@ import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDeck } from "@/store/useDeck";
 import { MediaAsset, MediaAssetKind, VIDEO_PLACEHOLDER_POSTER } from "@/data/media";
-
-const PROJECT_SLUG = "jw-gala-garden-night";
+import { useProjectSlug } from "@/components/ProjectProvider";
 
 const kindLabels: Record<MediaAssetKind | "all", string> = {
   all: "All",
@@ -24,6 +23,7 @@ export default function MediaLibraryPage() {
   const addMediaLink = useDeck((s) => s.addMediaLink);
   const searchMediaAssetsAI = useDeck((s) => s.searchMediaAssetsAI);
   const canWrite = myRole === "owner" || myRole === "editor";
+  const PROJECT_SLUG = useProjectSlug();
 
   const [filter, setFilter] = useState<MediaAssetKind | "all">("all");
   const [busy, setBusy] = useState(false);

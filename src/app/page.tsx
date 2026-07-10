@@ -134,7 +134,7 @@ export default function LandingPage() {
           slug="jw-gala-garden-night"
           name="JW Gala Garden Night"
           subtitle="JW Marriott Phuket · New Year's Eve 2026 — enter passcode for instant access"
-          dashboardHref="/dashboard"
+          dashboardHref="/p/jw-gala-garden-night/dashboard"
         />
       </section>
 

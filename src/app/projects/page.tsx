@@ -4,12 +4,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { listUserProjects } from "@/lib/auth/queries";
 import { SignOutButton } from "@/components/SignOutButton";
 import { ink, sub, border, hoverBg } from "@/lib/notionTheme";
-
-// Only project we route internally today — extend this map as more projects
-// get their own dashboards.
-const PROJECT_HREF: Record<string, string> = {
-  "jw-gala-garden-night": "/dashboard",
-};
+import { createProjectAction } from "./actions";
 
 export default async function ProjectsPage() {
   const user = await getSessionUser();
@@ -43,24 +38,46 @@ export default async function ProjectsPage() {
 
       <section className="mx-auto max-w-[880px] px-6 py-12">
         <h1 className="text-[22px] font-semibold mb-1">Your projects</h1>
-        <p className="text-[13.5px] mb-8" style={{ color: sub }}>
+        <p className="text-[13.5px] mb-6" style={{ color: sub }}>
           Signed in as {user.name} ({user.email})
         </p>
+
+        {/* Create a new project — self-serve for any signed-in user */}
+        <form
+          action={createProjectAction}
+          className="flex items-center gap-2 rounded-[8px] p-3 mb-8"
+          style={{ border: `1px solid ${border}` }}
+        >
+          <input
+            name="name"
+            placeholder="New project name (e.g. Sarah & Tom Wedding)"
+            required
+            maxLength={80}
+            className="text-[13.5px] rounded-[6px] px-3 py-2 flex-1"
+            style={{ border: `1px solid ${border}` }}
+          />
+          <button
+            type="submit"
+            className="text-[13.5px] font-medium rounded-[6px] px-4 py-2 shrink-0"
+            style={{ background: ink, color: "#fff" }}
+          >
+            Create project
+          </button>
+        </form>
 
         {projects.length === 0 ? (
           <div
             className="rounded-[8px] px-5 py-6 text-[13.5px]"
             style={{ border: `1px solid ${border}`, color: sub }}
           >
-            You don&apos;t have any projects assigned yet. Ask your admin to add you to
-            one.
+            You don&apos;t have any projects yet. Create one above to get started.
           </div>
         ) : (
           <div className="space-y-2">
             {projects.map((p) => (
               <Link
                 key={p.id}
-                href={PROJECT_HREF[p.slug] ?? "#"}
+                href={`/p/${p.slug}/dashboard`}
                 className="flex items-center gap-3.5 px-4 py-3.5 rounded-[8px] transition-colors"
                 style={{ border: `1px solid ${border}` }}
               >

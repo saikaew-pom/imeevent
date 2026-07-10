@@ -11,8 +11,10 @@ import { HoverCard } from "@/components/HoverCard";
 import { ExportSaveButtons } from "@/components/ExportSaveButtons";
 import { thb, thbShort, pct } from "@/lib/format";
 import Link from "next/link";
+import { useProjectSlug } from "@/components/ProjectProvider";
 
 export default function RevenuePage() {
+  const base = `/p/${useProjectSlug()}`;
   const contentRef = useRef<HTMLDivElement>(null);
   const financials = useDeck((s) => s.financials);
   const setTier = useDeck((s) => s.setTier);
@@ -45,7 +47,7 @@ export default function RevenuePage() {
           <p className="text-[13px] text-[var(--text-dim)] mt-1 max-w-2xl">
             Package revenue, cost by line item, and margin — benchmarked against the
             2023–2025 actuals. Edit the full cost structure in the{" "}
-            <Link href="/costing" className="emerald-text hover:underline">
+            <Link href={`${base}/costing`} className="emerald-text hover:underline">
               Costing deep dive
             </Link>
             .
@@ -145,7 +147,7 @@ export default function RevenuePage() {
               <h3 className="text-sm font-semibold" style={{ color: "var(--danger)" }}>
                 Cost by line item
               </h3>
-              <Link href="/costing" className="text-[11px] emerald-text hover:underline">
+              <Link href={`${base}/costing`} className="text-[11px] emerald-text hover:underline">
                 edit →
               </Link>
             </div>
@@ -184,7 +186,7 @@ export default function RevenuePage() {
             {showActs > 0 && (
               <p className="text-[11px] text-[var(--text-faint)] pt-2">
                 Includes {thb(showActs)} show acts from your{" "}
-                <Link href="/builder" className="emerald-text hover:underline">
+                <Link href={`${base}/builder`} className="emerald-text hover:underline">
                   lineup
                 </Link>
                 .

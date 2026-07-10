@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { ReviewFinding, FindingSeverity } from "@/data/runOfShow";
 import { useDeck } from "@/store/useDeck";
-
-const PROJECT_SLUG = "jw-gala-garden-night";
+import { useProjectSlug } from "@/components/ProjectProvider";
 
 const SEVERITY_META: Record<FindingSeverity, { label: string; color: string }> = {
   risk: { label: "Risk", color: "var(--danger)" },
@@ -20,6 +19,7 @@ export function RunOfShowReviewModal({
   onJumpToBeat: (beatId: string) => void;
 }) {
   const reviewRunOfShow = useDeck((s) => s.reviewRunOfShow);
+  const PROJECT_SLUG = useProjectSlug();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [findings, setFindings] = useState<ReviewFinding[] | null>(null);
