@@ -25,10 +25,10 @@ const modules = [
     accent: "var(--emerald-bright)",
   },
   {
-    href: "/finale",
+    href: "/media",
     tag: "04",
-    title: "Golden Bloom Finale",
-    body: "The finale creative brief with four concept boards to compare, plus the production risk board from the technical notes.",
+    title: "Media Library",
+    body: "Every photo, video, song and reference link uploaded anywhere in the project, searchable in one place — rename, sort by type, and reuse without re-uploading.",
     accent: "var(--gold-bright)",
   },
 ];

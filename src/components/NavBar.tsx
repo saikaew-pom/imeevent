@@ -10,7 +10,6 @@ const links = [
   { href: "/builder", label: "Show & Decor Builder" },
   { href: "/revenue", label: "Revenue" },
   { href: "/costing", label: "Costing" },
-  { href: "/finale", label: "Finale" },
   { href: "/timeline", label: "Timeline" },
   { href: "/media", label: "Media" },
 ];
