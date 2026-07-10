@@ -7,6 +7,7 @@ import { VibeLevel } from "@/data/presets";
 import { defaultFinancials, FinancialAssumptions, PackageTier } from "@/data/financials";
 import { CostGroupKey } from "@/data/costStructure";
 import { runOfShow, Beat } from "@/data/runOfShow";
+import { Slide } from "@/data/slides";
 
 export interface LineupItem {
   uid: string;
@@ -31,7 +32,7 @@ async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
 // Lineup/program/financials are shared project state (D1-backed) but change
 // on every keystroke (cost line inputs, drag reorders, etc), so we push each
 // key to the server on a short debounce instead of one request per edit.
-type StateKey = "lineup" | "program" | "financials";
+type StateKey = "lineup" | "program" | "financials" | "presentation";
 const persistTimers: Partial<Record<StateKey, ReturnType<typeof setTimeout>>> = {};
 
 function schedulePersist(slug: string | null, key: StateKey, data: unknown) {
@@ -60,6 +61,8 @@ interface DeckState {
   projectSlug: string | null;
   sharedStateLoaded: boolean;
   program: Beat[];
+  presentation: Slide[];
+  slideGenerating: string | null; // beatId currently being generated, if any
 
   setVideo: (key: string, url: string) => void;
   addAct: (slot: Placement, actId: string) => void;
@@ -107,6 +110,14 @@ interface DeckState {
   reorderProgram: (ids: string[]) => void;
   setBeatActs: (id: string, actIds: string[]) => void;
   resetProgram: () => void;
+
+  // Presentation slides — one per Event Flow beat, drafted via MiniMax AI
+  // then freely editable. Generation hits its own endpoint (an AI call, not
+  // a plain state write); manual edits go through the same debounced-state
+  // path as lineup/program/financials.
+  generateSlide: (slug: string, beatId: string) => Promise<{ ok: boolean; error?: string }>;
+  updateSlide: (id: string, patch: Partial<Slide>) => void;
+  removeSlide: (id: string) => void;
 }
 
 export const useDeck = create<DeckState>()(
@@ -116,6 +127,8 @@ export const useDeck = create<DeckState>()(
       const persistProgram = () => schedulePersist(get().projectSlug, "program", get().program);
       const persistFinancials = () =>
         schedulePersist(get().projectSlug, "financials", get().financials);
+      const persistPresentation = () =>
+        schedulePersist(get().projectSlug, "presentation", get().presentation);
 
       return {
         lineup: [],
@@ -130,6 +143,8 @@ export const useDeck = create<DeckState>()(
         projectSlug: null,
         sharedStateLoaded: false,
         program: runOfShow.map((b) => ({ ...b })),
+        presentation: [],
+        slideGenerating: null,
 
         setVideo: (key, url) => set((s) => ({ videos: { ...s.videos, [key]: url } })),
 
@@ -357,6 +372,7 @@ export const useDeck = create<DeckState>()(
               lineup: LineupItem[] | null;
               program: Beat[] | null;
               financials: FinancialAssumptions | null;
+              presentation: Slide[] | null;
             }>(`/api/builder/state?slug=${encodeURIComponent(slug)}`);
             set({
               projectSlug: slug,
@@ -365,6 +381,7 @@ export const useDeck = create<DeckState>()(
               ...(data.lineup !== null ? { lineup: data.lineup } : {}),
               ...(data.program !== null ? { program: data.program } : {}),
               ...(data.financials !== null ? { financials: data.financials } : {}),
+              ...(data.presentation !== null ? { presentation: data.presentation } : {}),
             });
           } catch {
             set({ projectSlug: slug, sharedStateLoaded: true });
@@ -430,14 +447,50 @@ export const useDeck = create<DeckState>()(
           set({ program: runOfShow.map((b) => ({ ...b })) });
           persistProgram();
         },
+
+        generateSlide: async (slug, beatId) => {
+          if (!isWritable(get().myRole)) return { ok: false, error: "Read-only access." };
+          set({ slideGenerating: beatId });
+          try {
+            const data = await apiJson<{ slide: Slide }>("/api/builder/presentation/generate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug, beatId }),
+            });
+            set((s) => ({
+              presentation: [...s.presentation.filter((sl) => sl.beatId !== beatId), data.slide],
+            }));
+            return { ok: true };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Generation failed." };
+          } finally {
+            set({ slideGenerating: null });
+          }
+        },
+
+        updateSlide: (id, patch) => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => ({
+            presentation: s.presentation.map((sl) =>
+              sl.id === id ? { ...sl, ...patch, aiGenerated: false } : sl
+            ),
+          }));
+          persistPresentation();
+        },
+
+        removeSlide: (id) => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => ({ presentation: s.presentation.filter((sl) => sl.id !== id) }));
+          persistPresentation();
+        },
       };
     },
     {
-      name: "jw-deck-v4",
-      version: 4,
+      name: "jw-deck-v5",
+      version: 5,
       // customActs/myRole/etc are server-synced (D1), not persisted locally —
-      // lineup/program/financials are also server-synced as of v4, but kept
-      // out of localStorage too since the server is now the source of truth.
+      // lineup/program/financials/presentation are also server-synced, but
+      // kept out of localStorage too since the server is now the source of truth.
       partialize: (state) => {
         const {
           customActs,
@@ -448,6 +501,8 @@ export const useDeck = create<DeckState>()(
           lineup,
           program,
           financials,
+          presentation,
+          slideGenerating,
           ...rest
         } = state;
         void customActs;
@@ -458,18 +513,21 @@ export const useDeck = create<DeckState>()(
         void lineup;
         void program;
         void financials;
+        void presentation;
+        void slideGenerating;
         return rest;
       },
       // v1: ensure VVIP tier exists. v2: ensure customActs/program exist for
       // state persisted before those were added. v3: custom acts moved to D1.
-      // v4: lineup/program/financials moved to D1 too — drop any stale
-      // locally-persisted copies (fresh defaults render until hydrated).
+      // v4: lineup/program/financials moved to D1 too. v5: presentation
+      // slides added, likewise server-synced — drop any stale local copies.
       migrate: (persisted, version) => {
         const s = persisted as {
           financials?: { tiers?: PackageTier[] };
           customActs?: Act[];
           program?: Beat[];
           lineup?: LineupItem[];
+          presentation?: Slide[];
         };
         if (
           version < 1 &&
@@ -492,6 +550,9 @@ export const useDeck = create<DeckState>()(
           delete s.program;
           delete s.lineup;
           delete s.financials;
+        }
+        if (version < 5) {
+          delete s.presentation;
         }
         return s as unknown;
       },

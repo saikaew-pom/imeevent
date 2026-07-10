@@ -1,22 +1,39 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useDeck } from "@/store/useDeck";
-import { eventMeta } from "@/data/runOfShow";
+import { eventMeta, Beat } from "@/data/runOfShow";
 import { EnergyCurve, CurvePoint } from "@/components/EnergyCurve";
 import { curvePoints, lineupTotals, orderedLineup } from "@/lib/analysis";
 import { liveBeatEnergy } from "@/lib/programEnergy";
 import { computePnL } from "@/lib/pnl";
 import { finaleConcepts, goldenBloom } from "@/data/finale";
 import { thb, pct } from "@/lib/format";
+import { findAct, Act, PLACEHOLDER_PHOTO } from "@/data/acts";
+import { Slide as SlideData } from "@/data/slides";
+import { SlideEditorModal } from "@/components/present/SlideEditorModal";
+
+const PROJECT_SLUG = "jw-gala-garden-night";
+
+const EXPORT_WIDTH = 1280;
+const EXPORT_HEIGHT = 720;
 
 export default function PresentPage() {
   const [i, setI] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const exportRefs = useRef<(HTMLDivElement | null)[]>([]);
   const lineup = useDeck((s) => s.lineup);
   const financials = useDeck((s) => s.financials);
   const program = useDeck((s) => s.program);
   const customActs = useDeck((s) => s.customActs);
+  const presentation = useDeck((s) => s.presentation);
+  const myRole = useDeck((s) => s.myRole);
+  const generateSlide = useDeck((s) => s.generateSlide);
+  const updateSlide = useDeck((s) => s.updateSlide);
+  const removeSlide = useDeck((s) => s.removeSlide);
+  const slideGenerating = useDeck((s) => s.slideGenerating);
+  const canWrite = myRole === "owner" || myRole === "editor";
 
   const totals = lineupTotals(lineup, customActs);
   const pnl = computePnL(financials, totals.totalCost);
@@ -86,7 +103,32 @@ export default function PresentPage() {
       )}
     </Slide>,
 
-    // 3 — Finale
+    // 3+ — One slide per Event Flow beat, AI-drafted (or a live fallback
+    // built straight from the beat's own fields until generated).
+    ...program.map((beat) => {
+      const slide = presentation.find((s) => s.beatId === beat.id);
+      return (
+        <BeatSlide
+          key={beat.id}
+          beat={beat}
+          slide={slide}
+          customActs={customActs}
+          canWrite={canWrite}
+          generating={slideGenerating === beat.id}
+          onGenerate={() => generateSlide(PROJECT_SLUG, beat.id)}
+          onSave={(patch) => {
+            if (slide) {
+              updateSlide(slide.id, patch);
+            } else {
+              updateSlide(`beat-${beat.id}`, { ...patch, beatId: beat.id });
+            }
+          }}
+          onReset={slide ? () => removeSlide(slide.id) : undefined}
+        />
+      );
+    }),
+
+    // Finale
     <Slide key="finale">
       <SlideTitle kicker="The finale" title={goldenBloom.title} />
       <div className="grid md:grid-cols-2 gap-6 items-center">
@@ -112,7 +154,7 @@ export default function PresentPage() {
       </div>
     </Slide>,
 
-    // 4 — Numbers
+    // Numbers
     <Slide key="numbers">
       <SlideTitle kicker="The numbers" title="Revenue model at a glance" />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -145,24 +187,91 @@ export default function PresentPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [go]);
 
+  // Keep the current index in range if the beat count changes underneath us.
+  useEffect(() => {
+    setI((x) => Math.min(x, n - 1));
+  }, [n]);
+
+  const exportPdf = async () => {
+    setExporting(true);
+    try {
+      const [{ toJpeg }, { jsPDF }] = await Promise.all([
+        import("html-to-image"),
+        import("jspdf"),
+      ]);
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "px",
+        format: [EXPORT_WIDTH, EXPORT_HEIGHT],
+      });
+      for (let idx = 0; idx < n; idx++) {
+        const node = exportRefs.current[idx];
+        if (!node) continue;
+        const dataUrl = await toJpeg(node, {
+          width: EXPORT_WIDTH,
+          height: EXPORT_HEIGHT,
+          quality: 0.92,
+          pixelRatio: 1.5,
+        });
+        if (idx > 0) pdf.addPage([EXPORT_WIDTH, EXPORT_HEIGHT], "landscape");
+        pdf.addImage(dataUrl, "JPEG", 0, 0, EXPORT_WIDTH, EXPORT_HEIGHT);
+      }
+      pdf.save("jw-gala-garden-night-presentation.pdf");
+    } catch {
+      alert("PDF export failed — try again.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col"
       style={{ background: "var(--bg)" }}
     >
+      {/* Off-screen full render of every slide, at a fixed export size, used
+          only to rasterize each page into the exported PDF. */}
+      <div style={{ position: "fixed", top: -99999, left: 0, pointerEvents: "none" }}>
+        {slides.map((slideEl, idx) => (
+          <div
+            key={idx}
+            ref={(el) => {
+              exportRefs.current[idx] = el;
+            }}
+            style={{
+              width: EXPORT_WIDTH,
+              height: EXPORT_HEIGHT,
+              overflow: "hidden",
+              background: "var(--bg)",
+            }}
+          >
+            {slideEl}
+          </div>
+        ))}
+      </div>
+
       <div className="flex-1 overflow-y-auto">{slides[i]}</div>
 
       {/* Controls */}
       <div className="flex items-center justify-between px-6 py-4 border-t hairline">
-        <Link href="/" className="btn py-1.5 px-3 text-[12px]">
-          ✕ Exit
-        </Link>
         <div className="flex items-center gap-2">
+          <Link href="/" className="btn py-1.5 px-3 text-[12px]">
+            ✕ Exit
+          </Link>
+          <button
+            onClick={exportPdf}
+            disabled={exporting}
+            className="btn py-1.5 px-3 text-[12px] disabled:opacity-50"
+          >
+            {exporting ? "Exporting…" : "⬇ Export PDF"}
+          </button>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap max-w-[50%] justify-center">
           {slides.map((_, idx) => (
             <button
               key={idx}
               onClick={() => setI(idx)}
-              className="w-2 h-2 rounded-full transition-all"
+              className="w-2 h-2 rounded-full transition-all shrink-0"
               style={{
                 background: idx === i ? "var(--gold-bright)" : "var(--border)",
                 width: idx === i ? 20 : 8,
@@ -187,6 +296,100 @@ export default function PresentPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function hasRealPhoto(a: Act): boolean {
+  return Boolean(a.photo) && a.photo !== PLACEHOLDER_PHOTO;
+}
+
+function BeatSlide({
+  beat,
+  slide,
+  customActs,
+  canWrite,
+  generating,
+  onGenerate,
+  onSave,
+  onReset,
+}: {
+  beat: Beat;
+  slide?: SlideData;
+  customActs: Act[];
+  canWrite: boolean;
+  generating: boolean;
+  onGenerate: () => void;
+  onSave: (patch: Partial<SlideData>) => void;
+  onReset?: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+
+  const linkedActs = (beat.linkedActs ?? [])
+    .map((id) => findAct(id, customActs))
+    .filter((a): a is Act => Boolean(a));
+
+  const title = slide?.title ?? beat.segment;
+  const subtitle = slide?.subtitle ?? `${beat.time} · ${beat.location}`;
+  const body = slide?.body ?? beat.what;
+  const image = slide?.imageUrl ?? beat.media?.photo ?? linkedActs.find(hasRealPhoto)?.photo;
+
+  return (
+    <Slide>
+      <div className="flex items-start justify-between gap-4 mb-2">
+        <SlideTitle kicker={`Run of show · ${beat.time}`} title={title} />
+        {canWrite && (
+          <div className="flex gap-2 shrink-0 pt-1">
+            <button
+              onClick={onGenerate}
+              disabled={generating}
+              className="btn py-1.5 px-3 text-[12px] disabled:opacity-50"
+            >
+              {generating ? "Generating…" : slide?.aiGenerated ? "↻ Regenerate" : "✦ Generate with AI"}
+            </button>
+            <button onClick={() => setEditing(true)} className="btn py-1.5 px-3 text-[12px]">
+              ✎ Edit
+            </button>
+            {onReset && (
+              <button
+                onClick={onReset}
+                className="btn py-1.5 px-3 text-[12px] hover:text-[var(--danger)]"
+              >
+                ↺ Reset
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      <p className="text-[13px] emerald-text mb-4">{subtitle}</p>
+      <div className="grid md:grid-cols-2 gap-6 items-center">
+        {image && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={image} alt={title} className="w-full rounded-2xl border hairline" />
+        )}
+        <div className={image ? "" : "md:col-span-2"}>
+          {body && (
+            <p className="text-[15px] text-[var(--text-dim)] leading-relaxed mb-4">{body}</p>
+          )}
+          {linkedActs.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {linkedActs.map((a) => (
+                <span key={a.id} className="chip">
+                  {a.name}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {editing && (
+        <SlideEditorModal
+          initial={{ title, subtitle, body, imageUrl: image }}
+          onClose={() => setEditing(false)}
+          onSave={onSave}
+        />
+      )}
+    </Slide>
   );
 }
 

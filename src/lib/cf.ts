@@ -38,6 +38,7 @@ export interface MinimalR2Bucket {
 export interface Env {
   DB: MinimalD1Database;
   PHOTOS: MinimalR2Bucket;
+  MINIMAX_API_KEY: string;
 }
 
 export async function getDB(): Promise<MinimalD1Database> {
@@ -48,4 +49,11 @@ export async function getDB(): Promise<MinimalD1Database> {
 export async function getPhotosBucket(): Promise<MinimalR2Bucket> {
   const { env } = await getCloudflareContext({ async: true });
   return (env as unknown as Env).PHOTOS;
+}
+
+export async function getMinimaxApiKey(): Promise<string> {
+  const { env } = await getCloudflareContext({ async: true });
+  const key = (env as unknown as Env).MINIMAX_API_KEY;
+  if (!key) throw new Error("MINIMAX_API_KEY is not configured.");
+  return key;
 }
