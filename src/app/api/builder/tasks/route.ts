@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   if (!access) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
 
   const tasks = await listTasks(access.project.id);
-  return NextResponse.json({ role: access.role, tasks });
+  return NextResponse.json({ role: access.role, tasks, eventDate: access.project.eventDate });
 }
 
 export async function POST(req: NextRequest) {

@@ -12,13 +12,15 @@ import {
 } from "@/data/tasks";
 import { TaskFormModal } from "@/components/timeline/TaskFormModal";
 import { GanttChart } from "@/components/timeline/GanttChart";
+import { PresetPickerModal } from "@/components/timeline/PresetPickerModal";
 
 const PROJECT_SLUG = "jw-gala-garden-night";
-const EVENT_DATE = new Date("2026-12-31T19:00:00");
 const ALL_CATEGORIES = Object.keys(CATEGORY_LABELS) as TaskCategory[];
 
-function daysUntilEvent(): number {
-  return Math.ceil((EVENT_DATE.getTime() - Date.now()) / 86400000);
+function daysUntil(eventDate: string | null): number | null {
+  if (!eventDate) return null;
+  const target = new Date(`${eventDate}T00:00:00Z`).getTime();
+  return Math.ceil((target - Date.now()) / 86400000);
 }
 
 export default function TimelinePage() {
@@ -28,11 +30,14 @@ export default function TimelinePage() {
   const addTask = useDeck((s) => s.addTask);
   const updateTask = useDeck((s) => s.updateTask);
   const removeTask = useDeck((s) => s.removeTask);
+  const importPreset = useDeck((s) => s.importPreset);
+  const eventDate = useDeck((s) => s.eventDate);
   const canWrite = myRole === "owner" || myRole === "editor";
 
   const [view, setView] = useState<"checklist" | "gantt">("checklist");
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all");
   const [formOpen, setFormOpen] = useState(false);
+  const [presetOpen, setPresetOpen] = useState(false);
   const [editing, setEditing] = useState<ProjectTask | null>(null);
   const [error, setError] = useState("");
 
@@ -77,8 +82,15 @@ export default function TimelinePage() {
     if (!result.ok) setError(result.error ?? "Failed to remove task.");
   };
 
-  const days = daysUntilEvent();
+  const days = daysUntil(eventDate);
   const doneCount = tasks.filter((t) => t.status === "done").length;
+
+  const handleImport = async (presetId: string, date: string) => {
+    setError("");
+    const result = await importPreset(PROJECT_SLUG, presetId, date);
+    if (!result.ok) setError(result.error ?? "Import failed.");
+    return result;
+  };
 
   return (
     <div className="mx-auto max-w-[1400px] px-5 py-8">
@@ -90,7 +102,7 @@ export default function TimelinePage() {
           </h1>
           <p className="text-[13px] text-[var(--text-dim)] mt-1 max-w-2xl">
             Prep tasks and deadlines leading up to the event —{" "}
-            {days >= 0 ? (
+            {days !== null && days >= 0 ? (
               <>
                 <span className="gold-text font-semibold">{days} days</span> to go ·{" "}
               </>
@@ -117,15 +129,23 @@ export default function TimelinePage() {
             ))}
           </div>
           {canWrite && (
-            <button
-              onClick={() => {
-                setEditing(null);
-                setFormOpen(true);
-              }}
-              className="btn btn-emerald py-1.5 px-3 text-[12.5px]"
-            >
-              + Add task
-            </button>
+            <>
+              <button
+                onClick={() => setPresetOpen(true)}
+                className="btn py-1.5 px-3 text-[12.5px]"
+              >
+                ✨ Use a preset
+              </button>
+              <button
+                onClick={() => {
+                  setEditing(null);
+                  setFormOpen(true);
+                }}
+                className="btn btn-emerald py-1.5 px-3 text-[12.5px]"
+              >
+                + Add task
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -156,7 +176,7 @@ export default function TimelinePage() {
       )}
 
       {view === "gantt" ? (
-        <GanttChart tasks={tasks} />
+        <GanttChart tasks={tasks} eventDate={eventDate} />
       ) : (
         <div className="space-y-5">
           {ALL_CATEGORIES.map((cat) => {
@@ -185,11 +205,27 @@ export default function TimelinePage() {
               </section>
             );
           })}
-          {filtered.length === 0 && (
+          {filtered.length === 0 && tasks.length === 0 && (
+            <div className="panel px-6 py-12 text-center">
+              <p className="text-[14px] text-[var(--text-dim)] mb-1">
+                No tasks yet.
+              </p>
+              <p className="text-[12.5px] text-[var(--text-faint)] mb-5">
+                Start from a preset for your event type, or add tasks one at a time.
+              </p>
+              {canWrite && (
+                <button
+                  onClick={() => setPresetOpen(true)}
+                  className="btn btn-gold py-2 px-5 text-[13px]"
+                >
+                  ✨ Start from a preset
+                </button>
+              )}
+            </div>
+          )}
+          {filtered.length === 0 && tasks.length > 0 && (
             <div className="panel px-6 py-10 text-center text-[13px] text-[var(--text-faint)]">
-              {tasks.length === 0
-                ? "No tasks yet — add the first prep task or deadline."
-                : "No tasks match this filter."}
+              No tasks match this filter.
             </div>
           )}
         </div>
@@ -204,6 +240,15 @@ export default function TimelinePage() {
             setEditing(null);
           }}
           onSubmit={submitForm}
+        />
+      )}
+
+      {presetOpen && (
+        <PresetPickerModal
+          existingCount={tasks.length}
+          defaultEventDate={eventDate}
+          onClose={() => setPresetOpen(false)}
+          onImport={handleImport}
         />
       )}
     </div>

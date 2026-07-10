@@ -17,6 +17,7 @@ export interface ProjectRow {
   slug: string;
   name: string;
   passcode: string | null;
+  eventDate: string | null;
 }
 
 function newId(): string {
@@ -80,7 +81,7 @@ export async function deleteUser(userId: string): Promise<void> {
 export async function listProjects(): Promise<ProjectRow[]> {
   const db = await getDB();
   const { results } = await db
-    .prepare("SELECT id, slug, name, passcode FROM projects ORDER BY created_at ASC")
+    .prepare("SELECT id, slug, name, passcode, event_date as eventDate FROM projects ORDER BY created_at ASC")
     .all<ProjectRow>();
   return results;
 }
@@ -88,9 +89,20 @@ export async function listProjects(): Promise<ProjectRow[]> {
 export async function getProjectBySlug(slug: string): Promise<ProjectRow | null> {
   const db = await getDB();
   return db
-    .prepare("SELECT id, slug, name, passcode FROM projects WHERE slug = ?")
+    .prepare("SELECT id, slug, name, passcode, event_date as eventDate FROM projects WHERE slug = ?")
     .bind(slug)
     .first<ProjectRow>();
+}
+
+export async function setProjectEventDate(
+  projectId: string,
+  eventDate: string
+): Promise<void> {
+  const db = await getDB();
+  await db
+    .prepare("UPDATE projects SET event_date = ? WHERE id = ?")
+    .bind(eventDate, projectId)
+    .run();
 }
 
 export async function setProjectPasscode(
@@ -162,7 +174,7 @@ export async function listUserProjects(userId: string): Promise<(ProjectRow & { 
   const db = await getDB();
   const { results } = await db
     .prepare(
-      `SELECT p.id, p.slug, p.name, p.passcode, pm.role
+      `SELECT p.id, p.slug, p.name, p.passcode, p.event_date as eventDate, pm.role
        FROM project_members pm
        JOIN projects p ON p.id = pm.project_id
        WHERE pm.user_id = ?

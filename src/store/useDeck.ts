@@ -67,6 +67,7 @@ interface DeckState {
   tasks: ProjectTask[];
   tasksLoaded: boolean;
   members: ProjectMember[];
+  eventDate: string | null;
 
   setVideo: (key: string, url: string) => void;
   addAct: (slot: Placement, actId: string) => void;
@@ -128,6 +129,11 @@ interface DeckState {
   // create/update/delete pattern as custom acts.
   hydrateTasks: (slug: string) => Promise<void>;
   hydrateMembers: (slug: string) => Promise<void>;
+  importPreset: (
+    slug: string,
+    presetId: string,
+    eventDate: string
+  ) => Promise<{ ok: boolean; error?: string; count?: number }>;
   addTask: (slug: string, input: NewTaskInput) => Promise<{ ok: boolean; error?: string }>;
   updateTask: (
     slug: string,
@@ -165,6 +171,7 @@ export const useDeck = create<DeckState>()(
         tasks: [],
         tasksLoaded: false,
         members: [],
+        eventDate: null,
 
         setVideo: (key, url) => set((s) => ({ videos: { ...s.videos, [key]: url } })),
 
@@ -506,12 +513,36 @@ export const useDeck = create<DeckState>()(
 
         hydrateTasks: async (slug) => {
           try {
-            const data = await apiJson<{ role: ProjectRole; tasks: ProjectTask[] }>(
-              `/api/builder/tasks?slug=${encodeURIComponent(slug)}`
-            );
-            set({ tasks: data.tasks, myRole: data.role, tasksLoaded: true });
+            const data = await apiJson<{
+              role: ProjectRole;
+              tasks: ProjectTask[];
+              eventDate: string | null;
+            }>(`/api/builder/tasks?slug=${encodeURIComponent(slug)}`);
+            set({
+              tasks: data.tasks,
+              myRole: data.role,
+              tasksLoaded: true,
+              eventDate: data.eventDate,
+            });
           } catch {
             set({ tasksLoaded: true });
+          }
+        },
+
+        importPreset: async (slug, presetId, eventDate) => {
+          try {
+            const data = await apiJson<{ tasks: ProjectTask[]; eventDate: string }>(
+              "/api/builder/tasks/import",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ slug, presetId, eventDate }),
+              }
+            );
+            set((s) => ({ tasks: [...s.tasks, ...data.tasks], eventDate: data.eventDate }));
+            return { ok: true, count: data.tasks.length };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Import failed." };
           }
         },
 
@@ -590,6 +621,7 @@ export const useDeck = create<DeckState>()(
           tasks,
           tasksLoaded,
           members,
+          eventDate,
           ...rest
         } = state;
         void customActs;
@@ -605,6 +637,7 @@ export const useDeck = create<DeckState>()(
         void tasks;
         void tasksLoaded;
         void members;
+        void eventDate;
         return rest;
       },
       // v1: ensure VVIP tier exists. v2: ensure customActs/program exist for

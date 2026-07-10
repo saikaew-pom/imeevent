@@ -122,6 +122,60 @@ export async function deleteTask(projectId: string, id: string): Promise<void> {
     .run();
 }
 
+export interface BulkTaskInput extends NewTaskInput {
+  sortOrder: number;
+}
+
+// Inserts many tasks (e.g. a preset import) with unassigned owner/assignee.
+// Loops single inserts — fine for the ~10–32 rows a preset produces.
+export async function createTasksBulk(
+  projectId: string,
+  createdBy: string,
+  rows: BulkTaskInput[]
+): Promise<ProjectTask[]> {
+  const db = await getDB();
+  const created: ProjectTask[] = [];
+  for (const input of rows) {
+    const id = crypto.randomUUID();
+    const title = input.title.trim() || "Untitled task";
+    const category = input.category ?? "general";
+    const status = input.status ?? "todo";
+    await db
+      .prepare(
+        `INSERT INTO project_tasks
+          (id, project_id, title, description, category, status, start_date, due_date, assignee_id, sort_order, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        id,
+        projectId,
+        title,
+        input.description?.trim() ?? "",
+        category,
+        status,
+        input.startDate || null,
+        input.dueDate || null,
+        null,
+        input.sortOrder,
+        createdBy
+      )
+      .run();
+    created.push({
+      id,
+      title,
+      description: input.description?.trim() ?? "",
+      category,
+      status,
+      startDate: input.startDate || null,
+      dueDate: input.dueDate || null,
+      assigneeId: null,
+      assigneeName: null,
+      sortOrder: input.sortOrder,
+    });
+  }
+  return created;
+}
+
 export async function taskExists(projectId: string, id: string): Promise<boolean> {
   const db = await getDB();
   const row = await db

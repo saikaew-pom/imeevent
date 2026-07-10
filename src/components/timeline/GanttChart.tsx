@@ -11,8 +11,6 @@ const CATEGORY_COLORS: Record<TaskCategory, string> = {
   general: "var(--text-faint)",
 };
 
-const EVENT_DATE = new Date("2026-12-31T00:00:00");
-
 function daysBetween(a: Date, b: Date): number {
   return (b.getTime() - a.getTime()) / 86400000;
 }
@@ -21,7 +19,14 @@ function monthLabel(d: Date): string {
   return d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
 }
 
-export function GanttChart({ tasks }: { tasks: ProjectTask[] }) {
+export function GanttChart({
+  tasks,
+  eventDate,
+}: {
+  tasks: ProjectTask[];
+  eventDate: string | null;
+}) {
+  const EVENT_DATE = eventDate ? new Date(`${eventDate}T00:00:00Z`) : null;
   const dated = tasks.filter((t) => t.dueDate);
   const undated = tasks.filter((t) => !t.dueDate);
 
@@ -34,14 +39,15 @@ export function GanttChart({ tasks }: { tasks: ProjectTask[] }) {
   }
 
   const today = new Date();
+  const anchorTimes = [today.getTime(), ...(EVENT_DATE ? [EVENT_DATE.getTime()] : [])];
   const allDates = dated.flatMap((t) =>
     [t.startDate, t.dueDate].filter(Boolean).map((d) => new Date(d as string))
   );
   const rangeStart = new Date(
-    Math.min(today.getTime(), EVENT_DATE.getTime(), ...allDates.map((d) => d.getTime()))
+    Math.min(...anchorTimes, ...allDates.map((d) => d.getTime()))
   );
   const rangeEnd = new Date(
-    Math.max(today.getTime(), EVENT_DATE.getTime(), ...allDates.map((d) => d.getTime()))
+    Math.max(...anchorTimes, ...allDates.map((d) => d.getTime()))
   );
   // Pad both ends by a few days so bars/markers never sit flush on the edge.
   rangeStart.setDate(rangeStart.getDate() - 3);
@@ -49,7 +55,7 @@ export function GanttChart({ tasks }: { tasks: ProjectTask[] }) {
   const totalDays = Math.max(1, daysBetween(rangeStart, rangeEnd));
   const pct = (d: Date) => (daysBetween(rangeStart, d) / totalDays) * 100;
   const todayPct = pct(today);
-  const eventPct = pct(EVENT_DATE);
+  const eventPct = EVENT_DATE ? pct(EVENT_DATE) : null;
 
   // Month gridlines across the range.
   const months: { label: string; pct: number }[] = [];
@@ -86,10 +92,12 @@ export function GanttChart({ tasks }: { tasks: ProjectTask[] }) {
             className="absolute top-0 bottom-0 border-l ml-40"
             style={{ left: `${todayPct}%`, borderColor: "var(--emerald-bright)", opacity: 0.5 }}
           />
-          <div
-            className="absolute top-0 bottom-0 border-l ml-40"
-            style={{ left: `${eventPct}%`, borderColor: "var(--gold-bright)", opacity: 0.6 }}
-          />
+          {eventPct !== null && (
+            <div
+              className="absolute top-0 bottom-0 border-l ml-40"
+              style={{ left: `${eventPct}%`, borderColor: "var(--gold-bright)", opacity: 0.6 }}
+            />
+          )}
 
           {Object.entries(grouped).map(([cat, catTasks]) => (
             <div key={cat} className="mb-1">
