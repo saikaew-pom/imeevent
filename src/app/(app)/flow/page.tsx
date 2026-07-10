@@ -226,7 +226,10 @@ function BeatRow({
   const linkedActs = (beat.linkedActs ?? [])
     .map((id) => findAct(id, customActs))
     .filter((a): a is Act => Boolean(a));
-  const hasDropdown = linkedActs.length > 0 || (beat.gallery && beat.gallery.length > 0);
+  const hasDropdown =
+    linkedActs.length > 0 ||
+    (beat.gallery && beat.gallery.length > 0) ||
+    (beat.refVideos && beat.refVideos.length > 0);
 
   const firstGalleryItem = beat.gallery?.[0];
   const thumbSrc =
@@ -350,10 +353,20 @@ function BeatRow({
           className="px-4 md:px-5 pb-4 pt-1 fade-up"
           style={{ borderTop: "1px solid var(--border-soft)" }}
         >
+          {beat.gallery && beat.gallery.length > 0 && (
+            <>
+              <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mt-3 mb-2">
+                Real footage &amp; photos · tap to play
+              </div>
+              <div className="mb-3">
+                <MediaGallery items={beat.gallery} />
+              </div>
+            </>
+          )}
           {linkedActs.length > 0 && (
             <>
               <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mt-3 mb-2">
-                Shows in this segment
+                Shows &amp; decor
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
                 {linkedActs.map((a) => (
@@ -369,11 +382,47 @@ function BeatRow({
                         {a.name}
                       </div>
                       <div className="text-[10px] text-[var(--text-faint)] truncate">
-                        {a.type}
+                        {a.kind === "decor" ? "Decor" : a.type}
                       </div>
                     </div>
                   </div>
                 ))}
+              </div>
+            </>
+          )}
+          {beat.refVideos && beat.refVideos.length > 0 && (
+            <>
+              <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mt-3 mb-2">
+                Reference videos
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+                {beat.refVideos.map((url, i) => {
+                  const embed = toEmbedUrl(url);
+                  return embed ? (
+                    <div
+                      key={i}
+                      className="relative w-full rounded-lg overflow-hidden border hairline"
+                      style={{ paddingBottom: "56.25%" }}
+                    >
+                      <iframe
+                        src={embed}
+                        className="absolute inset-0 w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : (
+                    <a
+                      key={i}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[12px] emerald-text hover:underline break-all self-start"
+                    >
+                      ↗ {url}
+                    </a>
+                  );
+                })}
               </div>
             </>
           )}

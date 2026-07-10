@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { MediaItem } from "@/data/runOfShow";
 
 export function MediaGallery({ items }: { items: MediaItem[] }) {
@@ -74,7 +75,7 @@ function Lightbox({
   onNav: (d: number) => void;
 }) {
   const m = items[index];
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.85)" }}
@@ -142,6 +143,7 @@ function Lightbox({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
