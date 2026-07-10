@@ -91,6 +91,7 @@ interface DeckState {
   addCostLine: (group: CostGroupKey) => void;
   removeCostLine: (id: string) => void;
   resetFinancials: () => void;
+  saveFinancialsNow: () => Promise<{ ok: boolean }>;
 
   // Custom acts / decor now live in D1, scoped per project — these are async
   // and hit the API rather than mutating local state directly.
@@ -341,6 +342,25 @@ export const useDeck = create<DeckState>()(
             },
           });
           persistFinancials();
+        },
+
+        // Financials already auto-save on a debounce; this flushes immediately
+        // so a "Save" button can confirm the write landed.
+        saveFinancialsNow: async () => {
+          const slug = get().projectSlug;
+          if (!slug || !isWritable(get().myRole)) return { ok: false };
+          const timer = persistTimers.financials;
+          if (timer) clearTimeout(timer);
+          try {
+            const res = await fetch("/api/builder/state", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug, key: "financials", data: get().financials }),
+            });
+            return { ok: res.ok };
+          } catch {
+            return { ok: false };
+          }
         },
 
         hydrateCustomActs: async (slug) => {

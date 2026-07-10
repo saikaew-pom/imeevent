@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useDeck } from "@/store/useDeck";
 import { lineupTotals } from "@/lib/analysis";
 import { computePnL, PnL } from "@/lib/pnl";
@@ -8,10 +8,12 @@ import { COST_GROUPS } from "@/data/costStructure";
 import { Waterfall } from "@/components/Waterfall";
 import { HistorySection } from "@/components/revenue/HistorySection";
 import { HoverCard } from "@/components/HoverCard";
+import { ExportSaveButtons } from "@/components/ExportSaveButtons";
 import { thb, thbShort, pct } from "@/lib/format";
 import Link from "next/link";
 
 export default function RevenuePage() {
+  const contentRef = useRef<HTMLDivElement>(null);
   const financials = useDeck((s) => s.financials);
   const setTier = useDeck((s) => s.setTier);
   const addTier = useDeck((s) => s.addTier);
@@ -33,7 +35,7 @@ export default function RevenuePage() {
   };
 
   return (
-    <div className="mx-auto max-w-[1400px] px-5 py-8">
+    <div ref={contentRef} className="mx-auto max-w-[1400px] px-5 py-8">
       <div className="flex flex-wrap items-end justify-between gap-4 mb-5">
         <div>
           <div className="chip mb-2">Module 03 · Revenue vs Costing</div>
@@ -49,11 +51,18 @@ export default function RevenuePage() {
             .
           </p>
         </div>
-        {canWrite && (
-          <button onClick={resetFinancials} className="btn">
-            Reset assumptions
-          </button>
-        )}
+        <div className="flex gap-2" data-export-hide>
+          {canWrite && (
+            <button onClick={resetFinancials} className="btn">
+              Reset assumptions
+            </button>
+          )}
+          <ExportSaveButtons
+            targetRef={contentRef}
+            filename="jw-gala-revenue.pdf"
+            canWrite={canWrite}
+          />
+        </div>
       </div>
 
       {/* KPI row */}

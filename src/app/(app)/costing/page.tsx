@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { useDeck } from "@/store/useDeck";
 import { lineupTotals } from "@/lib/analysis";
 import { computePnL } from "@/lib/pnl";
@@ -7,10 +8,12 @@ import { COST_GROUPS, CostGroupKey } from "@/data/costStructure";
 import { histGroupSubtotal, histSummary } from "@/data/history";
 import { Waterfall } from "@/components/Waterfall";
 import { HoverCard, InfoDot } from "@/components/HoverCard";
+import { ExportSaveButtons } from "@/components/ExportSaveButtons";
 import { thb, thbShort, pct } from "@/lib/format";
 import Link from "next/link";
 
 export default function CostingPage() {
+  const contentRef = useRef<HTMLDivElement>(null);
   const financials = useDeck((s) => s.financials);
   const setTier = useDeck((s) => s.setTier);
   const setCostLine = useDeck((s) => s.setCostLine);
@@ -30,7 +33,7 @@ export default function CostingPage() {
     pnl.groupTotals.find((g) => g.key === k)?.value ?? 0;
 
   return (
-    <div className="mx-auto max-w-[1400px] px-5 py-8">
+    <div ref={contentRef} className="mx-auto max-w-[1400px] px-5 py-8">
       <div className="flex flex-wrap items-end justify-between gap-4 mb-5">
         <div>
           <div className="chip mb-2">Module 03b · Deep Dive</div>
@@ -43,7 +46,7 @@ export default function CostingPage() {
             against the 2025 actual.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2" data-export-hide>
           <Link href="/revenue" className="btn">
             ← Summary
           </Link>
@@ -52,6 +55,11 @@ export default function CostingPage() {
               Reset
             </button>
           )}
+          <ExportSaveButtons
+            targetRef={contentRef}
+            filename="jw-gala-costing.pdf"
+            canWrite={canWrite}
+          />
         </div>
       </div>
 
