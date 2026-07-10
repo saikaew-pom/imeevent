@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useDeck } from "@/store/useDeck";
 import { MediaAsset, VIDEO_PLACEHOLDER_POSTER } from "@/data/media";
 import { MediaItem } from "@/data/runOfShow";
@@ -46,7 +47,7 @@ export function MediaPicker({
     }
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[85] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.6)" }}
@@ -143,6 +144,7 @@ export function MediaPicker({
           </p>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

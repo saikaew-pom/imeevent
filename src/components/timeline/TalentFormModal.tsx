@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useDeck } from "@/store/useDeck";
 import { Talent, NewTalentInput } from "@/data/talent";
 
@@ -85,7 +86,7 @@ export function TalentFormModal({
     else setError(result.error ?? "Something went wrong.");
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[80] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.6)" }}
@@ -220,7 +221,8 @@ export function TalentFormModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

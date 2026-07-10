@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Act,
   ItemKind,
@@ -115,7 +116,7 @@ export function ItemFormModal({
     else setError(result.error ?? "Something went wrong.");
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.6)" }}
@@ -343,7 +344,8 @@ export function ItemFormModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
