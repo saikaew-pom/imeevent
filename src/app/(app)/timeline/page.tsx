@@ -13,6 +13,9 @@ import {
 import { TaskFormModal } from "@/components/timeline/TaskFormModal";
 import { GanttChart } from "@/components/timeline/GanttChart";
 import { PresetPickerModal } from "@/components/timeline/PresetPickerModal";
+import { AddDocumentModal } from "@/components/timeline/AddDocumentModal";
+import { SuggestionsModal } from "@/components/timeline/SuggestionsModal";
+import { SuggestedTask } from "@/data/documents";
 
 const PROJECT_SLUG = "jw-gala-garden-night";
 const ALL_CATEGORIES = Object.keys(CATEGORY_LABELS) as TaskCategory[];
@@ -32,14 +35,31 @@ export default function TimelinePage() {
   const removeTask = useDeck((s) => s.removeTask);
   const importPreset = useDeck((s) => s.importPreset);
   const eventDate = useDeck((s) => s.eventDate);
+  const documents = useDeck((s) => s.documents);
+  const addDocument = useDeck((s) => s.addDocument);
+  const removeDocument = useDeck((s) => s.removeDocument);
+  const suggestTasks = useDeck((s) => s.suggestTasks);
+  const acceptSuggestions = useDeck((s) => s.acceptSuggestions);
   const canWrite = myRole === "owner" || myRole === "editor";
 
   const [view, setView] = useState<"checklist" | "gantt">("checklist");
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all");
   const [formOpen, setFormOpen] = useState(false);
   const [presetOpen, setPresetOpen] = useState(false);
+  const [docModalOpen, setDocModalOpen] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState<SuggestedTask[] | null>(null);
   const [editing, setEditing] = useState<ProjectTask | null>(null);
   const [error, setError] = useState("");
+
+  const runSuggest = async () => {
+    setError("");
+    setSuggesting(true);
+    const result = await suggestTasks(PROJECT_SLUG);
+    setSuggesting(false);
+    if (result.ok) setSuggestions(result.suggestions ?? []);
+    else setError(result.error ?? "AI suggestion failed.");
+  };
 
   const filtered = useMemo(
     () => (statusFilter === "all" ? tasks : tasks.filter((t) => t.status === statusFilter)),
@@ -156,6 +176,79 @@ export default function TimelinePage() {
         </p>
       )}
 
+      {/* Documents & AI planning */}
+      <section className="panel px-4 py-3.5 mb-5">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] uppercase tracking-wide text-[var(--text-faint)]">
+              Documents
+            </span>
+            <span className="text-[11px] text-[var(--text-faint)]">
+              {documents.length} attached
+            </span>
+          </div>
+          {canWrite && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setDocModalOpen(true)}
+                className="btn py-1.5 px-3 text-[12px]"
+              >
+                + Add document
+              </button>
+              <button
+                onClick={runSuggest}
+                disabled={suggesting || documents.length === 0}
+                className="btn btn-gold py-1.5 px-3 text-[12px] disabled:opacity-50"
+                title={documents.length === 0 ? "Add a document first" : "Let AI read your documents"}
+              >
+                {suggesting ? "Reading…" : "✨ AI: suggest tasks"}
+              </button>
+            </div>
+          )}
+        </div>
+        {documents.length === 0 ? (
+          <p className="text-[12px] text-[var(--text-faint)]">
+            Attach contracts, quotes or briefs (PDF, image, or pasted text). The AI reads
+            them and suggests tasks for your timeline.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {documents.map((d) => (
+              <span
+                key={d.id}
+                className="panel-2 flex items-center gap-2 pl-2.5 pr-1.5 py-1.5 text-[12px]"
+              >
+                <span>{d.kind === "pdf" ? "📄" : d.kind === "image" ? "🖼️" : "📝"}</span>
+                {d.fileKey ? (
+                  <a
+                    href={`/api/builder/photo/${d.fileKey}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:underline max-w-[220px] truncate"
+                    title={d.name}
+                  >
+                    {d.name}
+                  </a>
+                ) : (
+                  <span className="max-w-[220px] truncate" title={d.name}>
+                    {d.name}
+                  </span>
+                )}
+                {canWrite && (
+                  <button
+                    onClick={() => removeDocument(PROJECT_SLUG, d.id)}
+                    className="text-[var(--text-faint)] hover:text-[var(--danger)] px-1"
+                    title="Remove"
+                  >
+                    ✕
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+        )}
+      </section>
+
       {view === "checklist" && (
         <div className="flex gap-1 panel-2 p-1 mb-4 w-fit">
           {(["all", "todo", "in_progress", "done"] as const).map((s) => (
@@ -249,6 +342,21 @@ export default function TimelinePage() {
           defaultEventDate={eventDate}
           onClose={() => setPresetOpen(false)}
           onImport={handleImport}
+        />
+      )}
+
+      {docModalOpen && (
+        <AddDocumentModal
+          onClose={() => setDocModalOpen(false)}
+          onAdd={(input) => addDocument(PROJECT_SLUG, input)}
+        />
+      )}
+
+      {suggestions !== null && (
+        <SuggestionsModal
+          suggestions={suggestions}
+          onClose={() => setSuggestions(null)}
+          onAccept={(accepted) => acceptSuggestions(PROJECT_SLUG, accepted)}
         />
       )}
     </div>

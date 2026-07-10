@@ -9,6 +9,7 @@ import { CostGroupKey } from "@/data/costStructure";
 import { runOfShow, Beat } from "@/data/runOfShow";
 import { Slide } from "@/data/slides";
 import { ProjectTask, NewTaskInput, ProjectMember } from "@/data/tasks";
+import { ProjectDocument, NewDocumentInput, SuggestedTask } from "@/data/documents";
 
 export interface LineupItem {
   uid: string;
@@ -68,6 +69,8 @@ interface DeckState {
   tasksLoaded: boolean;
   members: ProjectMember[];
   eventDate: string | null;
+  documents: ProjectDocument[];
+  documentsLoaded: boolean;
 
   setVideo: (key: string, url: string) => void;
   addAct: (slot: Placement, actId: string) => void;
@@ -141,6 +144,21 @@ interface DeckState {
     input: NewTaskInput
   ) => Promise<{ ok: boolean; error?: string }>;
   removeTask: (slug: string, id: string) => Promise<{ ok: boolean; error?: string }>;
+
+  // Project document library + AI task suggestions.
+  hydrateDocuments: (slug: string) => Promise<void>;
+  addDocument: (
+    slug: string,
+    input: NewDocumentInput
+  ) => Promise<{ ok: boolean; error?: string }>;
+  removeDocument: (slug: string, id: string) => Promise<{ ok: boolean; error?: string }>;
+  suggestTasks: (
+    slug: string
+  ) => Promise<{ ok: boolean; error?: string; suggestions?: SuggestedTask[] }>;
+  acceptSuggestions: (
+    slug: string,
+    suggestions: SuggestedTask[]
+  ) => Promise<{ ok: boolean; added: number }>;
 }
 
 export const useDeck = create<DeckState>()(
@@ -172,6 +190,8 @@ export const useDeck = create<DeckState>()(
         tasksLoaded: false,
         members: [],
         eventDate: null,
+        documents: [],
+        documentsLoaded: false,
 
         setVideo: (key, url) => set((s) => ({ videos: { ...s.videos, [key]: url } })),
 
@@ -598,6 +618,76 @@ export const useDeck = create<DeckState>()(
             return { ok: false, error: e instanceof Error ? e.message : "Failed to remove task." };
           }
         },
+
+        hydrateDocuments: async (slug) => {
+          try {
+            const data = await apiJson<{ role: ProjectRole; documents: ProjectDocument[] }>(
+              `/api/builder/documents?slug=${encodeURIComponent(slug)}`
+            );
+            set({ documents: data.documents, myRole: data.role, documentsLoaded: true });
+          } catch {
+            set({ documentsLoaded: true });
+          }
+        },
+
+        addDocument: async (slug, input) => {
+          try {
+            const data = await apiJson<{ document: ProjectDocument }>("/api/builder/documents", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug, input }),
+            });
+            set((s) => ({ documents: [data.document, ...s.documents] }));
+            return { ok: true };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Failed to add document." };
+          }
+        },
+
+        removeDocument: async (slug, id) => {
+          try {
+            await apiJson(`/api/builder/documents/${id}`, {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug }),
+            });
+            set((s) => ({ documents: s.documents.filter((d) => d.id !== id) }));
+            return { ok: true };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Failed to remove document." };
+          }
+        },
+
+        suggestTasks: async (slug) => {
+          try {
+            const data = await apiJson<{ suggestions: SuggestedTask[] }>(
+              "/api/builder/documents/suggest",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ slug }),
+              }
+            );
+            return { ok: true, suggestions: data.suggestions };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "AI suggestion failed." };
+          }
+        },
+
+        acceptSuggestions: async (slug, suggestions) => {
+          let added = 0;
+          for (const s of suggestions) {
+            const result = await get().addTask(slug, {
+              title: s.title,
+              description: s.description,
+              category: s.category as NewTaskInput["category"],
+              status: "todo",
+              dueDate: s.dueDate,
+            });
+            if (result.ok) added++;
+          }
+          return { ok: added > 0, added };
+        },
       };
     },
     {
@@ -622,6 +712,8 @@ export const useDeck = create<DeckState>()(
           tasksLoaded,
           members,
           eventDate,
+          documents,
+          documentsLoaded,
           ...rest
         } = state;
         void customActs;
@@ -638,6 +730,8 @@ export const useDeck = create<DeckState>()(
         void tasksLoaded;
         void members;
         void eventDate;
+        void documents;
+        void documentsLoaded;
         return rest;
       },
       // v1: ensure VVIP tier exists. v2: ensure customActs/program exist for

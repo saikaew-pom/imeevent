@@ -39,6 +39,46 @@ export async function generateSlideCopy(prompt: string): Promise<string> {
   return content;
 }
 
+type ContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
+// A multimodal chat completion — text prompt plus optional public image URLs
+// (MiniMax-M3 vision). Returns the raw assistant text (callers parse it).
+export async function chatMultimodal(
+  prompt: string,
+  imageUrls: string[] = [],
+  maxTokens = 1500
+): Promise<string> {
+  const apiKey = await getMinimaxApiKey();
+  const parts: ContentPart[] = [{ type: "text", text: prompt }];
+  for (const url of imageUrls) parts.push({ type: "image_url", image_url: { url } });
+
+  const res = await fetch(`${BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: TEXT_MODEL,
+      messages: [{ role: "user", content: parts }],
+      max_completion_tokens: maxTokens,
+      temperature: 0.4,
+      thinking: { type: "disabled" },
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`MiniMax request failed (${res.status}): ${body.slice(0, 300)}`);
+  }
+  const data = (await res.json()) as ChatCompletionResponse;
+  let content = data.choices?.[0]?.message?.content?.trim();
+  content = content?.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  if (!content) throw new Error("MiniMax returned no content.");
+  return content;
+}
+
 interface ImageGenerationResponse {
   data?: { image_urls?: string[] };
   base_resp?: { status_code: number; status_msg: string };

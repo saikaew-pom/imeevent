@@ -13,13 +13,15 @@ export function CustomActsHydrator({ slug }: { slug: string }) {
   const hydrateSharedState = useDeck((s) => s.hydrateSharedState);
   const hydrateTasks = useDeck((s) => s.hydrateTasks);
   const hydrateMembers = useDeck((s) => s.hydrateMembers);
+  const hydrateDocuments = useDeck((s) => s.hydrateDocuments);
 
   useEffect(() => {
     hydrateCustomActs(slug);
     hydrateSharedState(slug);
     hydrateTasks(slug);
     hydrateMembers(slug);
-  }, [slug, hydrateCustomActs, hydrateSharedState, hydrateTasks, hydrateMembers]);
+    hydrateDocuments(slug);
+  }, [slug, hydrateCustomActs, hydrateSharedState, hydrateTasks, hydrateMembers, hydrateDocuments]);
 
   return null;
 }
