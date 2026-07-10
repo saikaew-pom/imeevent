@@ -11,6 +11,7 @@ const links = [
   { href: "/revenue", label: "Revenue" },
   { href: "/costing", label: "Costing" },
   { href: "/finale", label: "Finale" },
+  { href: "/timeline", label: "Timeline" },
 ];
 
 export function NavBar() {

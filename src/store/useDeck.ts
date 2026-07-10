@@ -8,6 +8,7 @@ import { defaultFinancials, FinancialAssumptions, PackageTier } from "@/data/fin
 import { CostGroupKey } from "@/data/costStructure";
 import { runOfShow, Beat } from "@/data/runOfShow";
 import { Slide } from "@/data/slides";
+import { ProjectTask, NewTaskInput, ProjectMember } from "@/data/tasks";
 
 export interface LineupItem {
   uid: string;
@@ -63,6 +64,9 @@ interface DeckState {
   program: Beat[];
   presentation: Slide[];
   slideGenerating: string | null; // beatId currently being generated, if any
+  tasks: ProjectTask[];
+  tasksLoaded: boolean;
+  members: ProjectMember[];
 
   setVideo: (key: string, url: string) => void;
   addAct: (slot: Placement, actId: string) => void;
@@ -118,6 +122,19 @@ interface DeckState {
   generateSlide: (slug: string, beatId: string) => Promise<{ ok: boolean; error?: string }>;
   updateSlide: (id: string, patch: Partial<Slide>) => void;
   removeSlide: (id: string) => void;
+
+  // Project management timeline — prep tasks/deadlines, D1-backed per
+  // project (own table, not the JSON-blob project_state), same async
+  // create/update/delete pattern as custom acts.
+  hydrateTasks: (slug: string) => Promise<void>;
+  hydrateMembers: (slug: string) => Promise<void>;
+  addTask: (slug: string, input: NewTaskInput) => Promise<{ ok: boolean; error?: string }>;
+  updateTask: (
+    slug: string,
+    id: string,
+    input: NewTaskInput
+  ) => Promise<{ ok: boolean; error?: string }>;
+  removeTask: (slug: string, id: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 export const useDeck = create<DeckState>()(
@@ -145,6 +162,9 @@ export const useDeck = create<DeckState>()(
         program: runOfShow.map((b) => ({ ...b })),
         presentation: [],
         slideGenerating: null,
+        tasks: [],
+        tasksLoaded: false,
+        members: [],
 
         setVideo: (key, url) => set((s) => ({ videos: { ...s.videos, [key]: url } })),
 
@@ -483,6 +503,70 @@ export const useDeck = create<DeckState>()(
           set((s) => ({ presentation: s.presentation.filter((sl) => sl.id !== id) }));
           persistPresentation();
         },
+
+        hydrateTasks: async (slug) => {
+          try {
+            const data = await apiJson<{ role: ProjectRole; tasks: ProjectTask[] }>(
+              `/api/builder/tasks?slug=${encodeURIComponent(slug)}`
+            );
+            set({ tasks: data.tasks, myRole: data.role, tasksLoaded: true });
+          } catch {
+            set({ tasksLoaded: true });
+          }
+        },
+
+        hydrateMembers: async (slug) => {
+          try {
+            const data = await apiJson<{ members: ProjectMember[] }>(
+              `/api/builder/members?slug=${encodeURIComponent(slug)}`
+            );
+            set({ members: data.members });
+          } catch {
+            // Non-critical — assignee picker just shows no options.
+          }
+        },
+
+        addTask: async (slug, input) => {
+          try {
+            const data = await apiJson<{ task: ProjectTask }>("/api/builder/tasks", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug, input }),
+            });
+            set((s) => ({ tasks: [...s.tasks, data.task] }));
+            return { ok: true };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Failed to add task." };
+          }
+        },
+
+        updateTask: async (slug, id, input) => {
+          try {
+            await apiJson(`/api/builder/tasks/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug, input }),
+            });
+            await get().hydrateTasks(slug);
+            return { ok: true };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Failed to save task." };
+          }
+        },
+
+        removeTask: async (slug, id) => {
+          try {
+            await apiJson(`/api/builder/tasks/${id}`, {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug }),
+            });
+            set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }));
+            return { ok: true };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Failed to remove task." };
+          }
+        },
       };
     },
     {
@@ -503,6 +587,9 @@ export const useDeck = create<DeckState>()(
           financials,
           presentation,
           slideGenerating,
+          tasks,
+          tasksLoaded,
+          members,
           ...rest
         } = state;
         void customActs;
@@ -515,6 +602,9 @@ export const useDeck = create<DeckState>()(
         void financials;
         void presentation;
         void slideGenerating;
+        void tasks;
+        void tasksLoaded;
+        void members;
         return rest;
       },
       // v1: ensure VVIP tier exists. v2: ensure customActs/program exist for
