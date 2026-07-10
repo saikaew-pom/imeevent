@@ -6,10 +6,11 @@ import { Placement, ThemeKey, Act, NewActInput } from "@/data/acts";
 import { VibeLevel } from "@/data/presets";
 import { defaultFinancials, FinancialAssumptions, PackageTier } from "@/data/financials";
 import { CostGroupKey } from "@/data/costStructure";
-import { runOfShow, Beat } from "@/data/runOfShow";
+import { runOfShow, Beat, MediaItem } from "@/data/runOfShow";
 import { Slide } from "@/data/slides";
 import { ProjectTask, NewTaskInput, ProjectMember } from "@/data/tasks";
 import { ProjectDocument, NewDocumentInput, SuggestedTask } from "@/data/documents";
+import { MediaAsset } from "@/data/media";
 
 export interface LineupItem {
   uid: string;
@@ -56,7 +57,6 @@ interface DeckState {
   vibe: VibeLevel;
   numShows: number;
   financials: FinancialAssumptions;
-  videos: Record<string, string>;
   customActs: Act[];
   customActsLoaded: boolean;
   myRole: ProjectRole | null;
@@ -71,8 +71,9 @@ interface DeckState {
   eventDate: string | null;
   documents: ProjectDocument[];
   documentsLoaded: boolean;
+  mediaAssets: MediaAsset[];
+  mediaAssetsLoaded: boolean;
 
-  setVideo: (key: string, url: string) => void;
   addAct: (slot: Placement, actId: string) => void;
   removeItem: (uid: string) => void;
   reorderSlot: (slot: Placement, uids: string[]) => void;
@@ -160,6 +161,26 @@ interface DeckState {
     slug: string,
     suggestions: SuggestedTask[]
   ) => Promise<{ ok: boolean; added: number }>;
+
+  // Master media library — reusable uploaded photos/clips, project-scoped.
+  hydrateMediaAssets: (slug: string) => Promise<void>;
+  uploadMediaAsset: (
+    slug: string,
+    file: File,
+    name?: string,
+    poster?: File
+  ) => Promise<{ ok: boolean; asset?: MediaAsset; error?: string }>;
+  renameMediaAsset: (slug: string, id: string, name: string) => Promise<{ ok: boolean }>;
+  removeMediaAsset: (slug: string, id: string) => Promise<{ ok: boolean }>;
+
+  // Beat-level media: gallery items, the featured key visual, and unlimited
+  // pasted reference-video links. All go through updateProgramBeat so they
+  // inherit its write-gating and debounced persistence for free.
+  addBeatGalleryItem: (beatId: string, item: MediaItem) => void;
+  removeBeatGalleryItem: (beatId: string, index: number) => void;
+  setBeatKeyVisual: (beatId: string, url: string) => void;
+  addRefVideo: (beatId: string, url: string) => void;
+  removeRefVideo: (beatId: string, index: number) => void;
 }
 
 export const useDeck = create<DeckState>()(
@@ -178,7 +199,6 @@ export const useDeck = create<DeckState>()(
         vibe: "balanced",
         numShows: 3,
         financials: { ...defaultFinancials },
-        videos: {},
         customActs: [],
         customActsLoaded: false,
         myRole: null,
@@ -193,8 +213,8 @@ export const useDeck = create<DeckState>()(
         eventDate: null,
         documents: [],
         documentsLoaded: false,
-
-        setVideo: (key, url) => set((s) => ({ videos: { ...s.videos, [key]: url } })),
+        mediaAssets: [],
+        mediaAssetsLoaded: false,
 
         addAct: (slot, actId) => {
           if (!isWritable(get().myRole)) return;
@@ -708,11 +728,105 @@ export const useDeck = create<DeckState>()(
           }
           return { ok: added > 0, added };
         },
+
+        hydrateMediaAssets: async (slug) => {
+          try {
+            const data = await apiJson<{ role: ProjectRole; assets: MediaAsset[] }>(
+              `/api/builder/media?slug=${encodeURIComponent(slug)}`
+            );
+            set({ mediaAssets: data.assets, myRole: data.role, mediaAssetsLoaded: true });
+          } catch {
+            set({ mediaAssetsLoaded: true });
+          }
+        },
+
+        uploadMediaAsset: async (slug, file, name, poster) => {
+          try {
+            const form = new FormData();
+            form.append("file", file);
+            if (name) form.append("name", name);
+            if (poster) form.append("poster", poster);
+            const res = await fetch(
+              `/api/builder/media/upload?slug=${encodeURIComponent(slug)}`,
+              { method: "POST", body: form }
+            );
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error ?? "Upload failed.");
+            set((s) => ({ mediaAssets: [data.asset, ...s.mediaAssets] }));
+            return { ok: true, asset: data.asset as MediaAsset };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Upload failed." };
+          }
+        },
+
+        renameMediaAsset: async (slug, id, name) => {
+          try {
+            await apiJson(`/api/builder/media/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug, name }),
+            });
+            set((s) => ({
+              mediaAssets: s.mediaAssets.map((a) => (a.id === id ? { ...a, name } : a)),
+            }));
+            return { ok: true };
+          } catch {
+            return { ok: false };
+          }
+        },
+
+        removeMediaAsset: async (slug, id) => {
+          try {
+            await apiJson(`/api/builder/media/${id}`, {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug }),
+            });
+            set((s) => ({ mediaAssets: s.mediaAssets.filter((a) => a.id !== id) }));
+            return { ok: true };
+          } catch {
+            return { ok: false };
+          }
+        },
+
+        addBeatGalleryItem: (beatId, item) => {
+          const beat = get().program.find((b) => b.id === beatId);
+          if (!beat) return;
+          get().updateProgramBeat(beatId, { gallery: [...(beat.gallery ?? []), item] });
+        },
+
+        removeBeatGalleryItem: (beatId, index) => {
+          const beat = get().program.find((b) => b.id === beatId);
+          if (!beat) return;
+          get().updateProgramBeat(beatId, {
+            gallery: (beat.gallery ?? []).filter((_, i) => i !== index),
+          });
+        },
+
+        setBeatKeyVisual: (beatId, url) => {
+          const beat = get().program.find((b) => b.id === beatId);
+          if (!beat) return;
+          get().updateProgramBeat(beatId, { media: { ...beat.media, photo: url } });
+        },
+
+        addRefVideo: (beatId, url) => {
+          const beat = get().program.find((b) => b.id === beatId);
+          if (!beat || !url.trim()) return;
+          get().updateProgramBeat(beatId, { refVideos: [...(beat.refVideos ?? []), url.trim()] });
+        },
+
+        removeRefVideo: (beatId, index) => {
+          const beat = get().program.find((b) => b.id === beatId);
+          if (!beat) return;
+          get().updateProgramBeat(beatId, {
+            refVideos: (beat.refVideos ?? []).filter((_, i) => i !== index),
+          });
+        },
       };
     },
     {
-      name: "jw-deck-v5",
-      version: 5,
+      name: "jw-deck-v6",
+      version: 6,
       // customActs/myRole/etc are server-synced (D1), not persisted locally —
       // lineup/program/financials/presentation are also server-synced, but
       // kept out of localStorage too since the server is now the source of truth.
@@ -734,6 +848,8 @@ export const useDeck = create<DeckState>()(
           eventDate,
           documents,
           documentsLoaded,
+          mediaAssets,
+          mediaAssetsLoaded,
           ...rest
         } = state;
         void customActs;
@@ -752,12 +868,16 @@ export const useDeck = create<DeckState>()(
         void eventDate;
         void documents;
         void documentsLoaded;
+        void mediaAssets;
+        void mediaAssetsLoaded;
         return rest;
       },
       // v1: ensure VVIP tier exists. v2: ensure customActs/program exist for
       // state persisted before those were added. v3: custom acts moved to D1.
       // v4: lineup/program/financials moved to D1 too. v5: presentation
-      // slides added, likewise server-synced — drop any stale local copies.
+      // slides added, likewise server-synced. v6: the single local-only
+      // reference-video slot was replaced by Beat.refVideos (server-synced,
+      // unlimited) — drop the old `videos` map.
       migrate: (persisted, version) => {
         const s = persisted as {
           financials?: { tiers?: PackageTier[] };
@@ -765,6 +885,7 @@ export const useDeck = create<DeckState>()(
           program?: Beat[];
           lineup?: LineupItem[];
           presentation?: Slide[];
+          videos?: Record<string, string>;
         };
         if (
           version < 1 &&
@@ -790,6 +911,9 @@ export const useDeck = create<DeckState>()(
         }
         if (version < 5) {
           delete s.presentation;
+        }
+        if (version < 6) {
+          delete s.videos;
         }
         return s as unknown;
       },

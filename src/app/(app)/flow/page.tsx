@@ -5,10 +5,13 @@ import { eventMeta, whySpacingWorks, Beat } from "@/data/runOfShow";
 import { allActsList, findAct, Act } from "@/data/acts";
 import { EnergyCurve, CurvePoint } from "@/components/EnergyCurve";
 import { MediaGallery } from "@/components/MediaGallery";
+import { MediaPicker } from "@/components/media/MediaPicker";
 import { liveBeatEnergy } from "@/lib/programEnergy";
 import { energyColor } from "@/lib/format";
 import { useDeck } from "@/store/useDeck";
 import { toEmbedUrl } from "@/lib/embed";
+
+const PROJECT_SLUG = "jw-gala-garden-night";
 
 const peakLabels: Record<string, string> = {
   peak1: "Peak 1",
@@ -350,20 +353,23 @@ function BeatDrawer({
 }) {
   const beat = useDeck((s) => s.program.find((b) => b.id === beatId));
   const customActs = useDeck((s) => s.customActs);
-  const videos = useDeck((s) => s.videos);
-  const setVideo = useDeck((s) => s.setVideo);
   const updateProgramBeat = useDeck((s) => s.updateProgramBeat);
   const removeProgramBeat = useDeck((s) => s.removeProgramBeat);
   const setBeatActs = useDeck((s) => s.setBeatActs);
+  const addBeatGalleryItem = useDeck((s) => s.addBeatGalleryItem);
+  const removeBeatGalleryItem = useDeck((s) => s.removeBeatGalleryItem);
+  const setBeatKeyVisual = useDeck((s) => s.setBeatKeyVisual);
+  const addRefVideo = useDeck((s) => s.addRefVideo);
+  const removeRefVideo = useDeck((s) => s.removeRefVideo);
   const myRole = useDeck((s) => s.myRole);
   const canWrite = myRole === "owner" || myRole === "editor";
 
-  const [draft, setDraft] = useState(videos[`beat-${beatId}`] ?? "");
   const [addingActId, setAddingActId] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [newVideoUrl, setNewVideoUrl] = useState("");
 
   if (!beat) return null; // deleted mid-edit
 
-  const embed = toEmbedUrl(videos[`beat-${beatId}`] ?? "");
   const linkedActs = (beat.linkedActs ?? [])
     .map((id) => findAct(id, customActs))
     .filter((a): a is Act => Boolean(a));
@@ -427,13 +433,21 @@ function BeatDrawer({
           </button>
         </div>
 
-        {beat.media?.photo && (
+        {beat.media?.photo ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={beat.media.photo}
             alt={beat.segment}
             className="w-full rounded-xl mb-4 border hairline"
           />
+        ) : (
+          planner &&
+          canWrite && (
+            <p className="text-[11px] text-[var(--text-faint)] mb-4">
+              No key visual yet — pick one from the gallery below (this is what shows on
+              the presentation slide for this beat).
+            </p>
+          )
         )}
 
         {planner ? (
@@ -542,13 +556,74 @@ function BeatDrawer({
           </p>
         )}
 
-        {beat.gallery && beat.gallery.length > 0 && (
-          <div className="mb-5">
-            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-2">
+        <div className="mb-5">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">
               Real footage &amp; photos · tap to play
-            </div>
-            <MediaGallery items={beat.gallery} />
+            </span>
+            {planner && canWrite && (
+              <button
+                onClick={() => setPickerOpen(true)}
+                className="text-[11px] emerald-text hover:underline"
+              >
+                + Add photo/video
+              </button>
+            )}
           </div>
+
+          {beat.gallery && beat.gallery.length > 0 ? (
+            <>
+              <MediaGallery items={beat.gallery} />
+              {planner && canWrite && (
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                  {beat.gallery.map((m, i) => (
+                    <div key={i} className="relative panel-2 overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={m.type === "video" ? m.poster : m.src}
+                        alt={m.label ?? ""}
+                        className="w-full h-14 object-cover opacity-70"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center gap-1.5 opacity-0 hover:opacity-100 transition-opacity" style={{ background: "rgba(10,15,13,0.6)" }}>
+                        {m.type === "image" && (
+                          <button
+                            onClick={() => setBeatKeyVisual(beat.id, m.src)}
+                            title="Set as key visual"
+                            className="w-6 h-6 rounded-full flex items-center justify-center text-[11px]"
+                            style={{ background: "rgba(217,180,90,0.9)", color: "#0a0f0d" }}
+                          >
+                            ★
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removeBeatGalleryItem(beat.id, i)}
+                          title="Remove from this beat"
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-[11px]"
+                          style={{ background: "rgba(217,60,60,0.85)", color: "#fff" }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            !planner || !canWrite ? null : (
+              <p className="text-[12px] text-[var(--text-faint)]">
+                No photos or clips yet.
+              </p>
+            )
+          )}
+        </div>
+
+        {pickerOpen && (
+          <MediaPicker
+            slug={PROJECT_SLUG}
+            onClose={() => setPickerOpen(false)}
+            onPick={(item) => addBeatGalleryItem(beat.id, item)}
+          />
         )}
 
         {beat.links && beat.links.length > 0 && (
@@ -634,45 +709,78 @@ function BeatDrawer({
           )}
         </div>
 
-        {/* Video slot */}
+        {/* Reference videos — unlimited pasted links */}
         <div>
           <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-2">
-            Reference video
+            Reference videos
           </div>
-          {embed ? (
-            <div className="mb-2">
-              <div
-                className="relative w-full rounded-xl overflow-hidden border hairline"
-                style={{ paddingBottom: "56.25%" }}
-              >
-                <iframe
-                  src={embed}
-                  className="absolute inset-0 w-full h-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              </div>
-            </div>
-          ) : (
+          {(beat.refVideos ?? []).length === 0 ? (
             <p className="text-[12px] text-[var(--text-faint)] mb-2">
-              Paste a YouTube or Vimeo link to attach a reference clip to this beat.
+              Paste a YouTube or Vimeo link to attach reference clips to this beat — you
+              can add as many as you like.
             </p>
+          ) : (
+            <div className="space-y-3 mb-3">
+              {(beat.refVideos ?? []).map((url, i) => {
+                const embed = toEmbedUrl(url);
+                return (
+                  <div key={i}>
+                    {embed ? (
+                      <div
+                        className="relative w-full rounded-xl overflow-hidden border hairline"
+                        style={{ paddingBottom: "56.25%" }}
+                      >
+                        <iframe
+                          src={embed}
+                          className="absolute inset-0 w-full h-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        />
+                      </div>
+                    ) : (
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[12px] emerald-text hover:underline break-all"
+                      >
+                        ↗ {url}
+                      </a>
+                    )}
+                    {planner && canWrite && (
+                      <button
+                        onClick={() => removeRefVideo(beat.id, i)}
+                        className="text-[11px] text-[var(--text-faint)] hover:text-[var(--danger)] mt-1"
+                      >
+                        ✕ Remove
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder="https://youtube.com/watch?v=…"
-              className="flex-1"
-            />
-            <button
-              className="btn btn-emerald"
-              onClick={() => setVideo(`beat-${beatId}`, draft)}
-            >
-              Attach
-            </button>
-          </div>
+          {planner && canWrite && (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newVideoUrl}
+                onChange={(e) => setNewVideoUrl(e.target.value)}
+                placeholder="https://youtube.com/watch?v=…"
+                className="flex-1"
+              />
+              <button
+                className="btn btn-emerald"
+                onClick={() => {
+                  addRefVideo(beat.id, newVideoUrl);
+                  setNewVideoUrl("");
+                }}
+                disabled={!newVideoUrl.trim()}
+              >
+                Attach
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

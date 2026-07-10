@@ -28,6 +28,7 @@ export interface Beat {
   media?: { photo?: string; videoUrl?: string };
   gallery?: MediaItem[];
   links?: BeatLink[];
+  refVideos?: string[]; // unlimited pasted YouTube/Vimeo reference links
   custom?: boolean; // true if added by the user in the planner (not the original run of show)
 }
 
