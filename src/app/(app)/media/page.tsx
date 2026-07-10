@@ -16,6 +16,7 @@ export default function MediaLibraryPage() {
 
   const [filter, setFilter] = useState<MediaAssetKind | "all">("all");
   const [busy, setBusy] = useState(false);
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -28,8 +29,10 @@ export default function MediaLibraryPage() {
   const handleUpload = async (file: File) => {
     setError("");
     setBusy(true);
-    const result = await uploadMediaAsset(PROJECT_SLUG, file);
+    setUploadPct(null);
+    const result = await uploadMediaAsset(PROJECT_SLUG, file, undefined, setUploadPct);
     setBusy(false);
+    setUploadPct(null);
     if (!result.ok) setError(result.error ?? "Upload failed.");
   };
 
@@ -61,10 +64,13 @@ export default function MediaLibraryPage() {
             so it can be reused across Event Flow beats, talent references, and shows
             without re-uploading.
           </p>
+          <p className="text-[11px] text-[var(--text-faint)] mt-1">
+            Images up to 8MB. Video clips and songs up to 150MB.
+          </p>
         </div>
         {canWrite && (
           <label className="btn btn-emerald py-1.5 px-3 text-[12.5px] cursor-pointer">
-            {busy ? "Uploading…" : "+ Upload"}
+            {busy ? (uploadPct !== null ? `Uploading… ${uploadPct}%` : "Uploading…") : "+ Upload"}
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,audio/mpeg"

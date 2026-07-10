@@ -25,6 +25,24 @@ export interface R2ObjectBody {
   httpMetadata?: { contentType?: string };
 }
 
+// Uploading a large file in one shot means buffering the whole thing in the
+// Worker's memory (128MB hard cap per isolate) and staying under Cloudflare's
+// ~100MB request body limit — neither survives a 150MB video. R2's native
+// multipart API lets the browser upload it in small chunks instead, each one
+// well under both limits regardless of the total file size.
+export interface R2UploadedPart {
+  partNumber: number;
+  etag: string;
+}
+
+export interface MinimalR2MultipartUpload {
+  readonly key: string;
+  readonly uploadId: string;
+  uploadPart(partNumber: number, value: ArrayBuffer): Promise<R2UploadedPart>;
+  complete(uploadedParts: R2UploadedPart[]): Promise<unknown>;
+  abort(): Promise<void>;
+}
+
 export interface MinimalR2Bucket {
   put(
     key: string,
@@ -33,6 +51,12 @@ export interface MinimalR2Bucket {
   ): Promise<unknown>;
   get(key: string): Promise<R2ObjectBody | null>;
   delete(key: string): Promise<void>;
+  createMultipartUpload(
+    key: string,
+    options?: { httpMetadata?: { contentType?: string } }
+  ): Promise<MinimalR2MultipartUpload>;
+  // Real R2 binding: synchronous, doesn't validate uploadId until first use.
+  resumeMultipartUpload(key: string, uploadId: string): MinimalR2MultipartUpload;
 }
 
 export interface Env {

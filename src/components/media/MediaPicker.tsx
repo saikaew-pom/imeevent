@@ -36,13 +36,16 @@ export function MediaPicker({
   const [tab, setTab] = useState<Tab>("upload");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [error, setError] = useState("");
 
   const handleUpload = async (file: File) => {
     setError("");
     setBusy(true);
-    const result = await uploadMediaAsset(slug, file, name || undefined);
+    setUploadPct(null);
+    const result = await uploadMediaAsset(slug, file, name || undefined, setUploadPct);
     setBusy(false);
+    setUploadPct(null);
     if (result.ok && result.asset) {
       onPick(assetToMediaItem(result.asset), result.asset);
       onClose();
@@ -95,7 +98,7 @@ export function MediaPicker({
               className="w-full"
             />
             <label className="btn btn-emerald px-3 py-2 text-[12.5px] cursor-pointer inline-block">
-              {busy ? "Uploading…" : "Choose photo or video"}
+              {busy ? (uploadPct !== null ? `Uploading… ${uploadPct}%` : "Uploading…") : "Choose photo or video"}
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
@@ -109,7 +112,7 @@ export function MediaPicker({
               />
             </label>
             <p className="text-[11px] text-[var(--text-faint)]">
-              Images up to 8MB. Video clips up to 50MB — for longer footage, paste a
+              Images up to 8MB. Video clips up to 150MB — for longer footage, paste a
               YouTube/Vimeo link instead.
             </p>
           </div>

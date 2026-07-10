@@ -33,6 +33,11 @@ async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
+// Video/audio upload chunk size — see the multipart upload routes and
+// src/lib/cf.ts for why this needs to stay well under Cloudflare's
+// per-request body-size (~100MB) and Worker memory (128MB) limits.
+const MEDIA_CHUNK_BYTES = 8 * 1024 * 1024; // 8MB
+
 // Lineup/program/financials are shared project state (D1-backed) but change
 // on every keystroke (cost line inputs, drag reorders, etc), so we push each
 // key to the server on a short debounce instead of one request per edit.
@@ -172,7 +177,7 @@ interface DeckState {
     slug: string,
     file: File,
     name?: string,
-    poster?: File
+    onProgress?: (pct: number) => void
   ) => Promise<{ ok: boolean; asset?: MediaAsset; error?: string }>;
   renameMediaAsset: (slug: string, id: string, name: string) => Promise<{ ok: boolean }>;
   removeMediaAsset: (slug: string, id: string) => Promise<{ ok: boolean }>;
@@ -779,21 +784,81 @@ export const useDeck = create<DeckState>()(
           }
         },
 
-        uploadMediaAsset: async (slug, file, name, poster) => {
+        uploadMediaAsset: async (slug, file, name, onProgress) => {
+          const isLarge = file.type.startsWith("video/") || file.type.startsWith("audio/");
+          if (!isLarge) {
+            try {
+              const form = new FormData();
+              form.append("file", file);
+              if (name) form.append("name", name);
+              const res = await fetch(
+                `/api/builder/media/upload?slug=${encodeURIComponent(slug)}`,
+                { method: "POST", body: form }
+              );
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(data.error ?? "Upload failed.");
+              set((s) => ({ mediaAssets: [data.asset, ...s.mediaAssets] }));
+              return { ok: true, asset: data.asset as MediaAsset };
+            } catch (e) {
+              return { ok: false, error: e instanceof Error ? e.message : "Upload failed." };
+            }
+          }
+
+          // Video/audio: chunked upload straight to R2, one small part at a
+          // time, so no single request ever risks the Worker's body-size or
+          // memory limits regardless of the file's total size (up to 150MB).
+          let key = "";
+          let uploadId = "";
           try {
-            const form = new FormData();
-            form.append("file", file);
-            if (name) form.append("name", name);
-            if (poster) form.append("poster", poster);
-            const res = await fetch(
-              `/api/builder/media/upload?slug=${encodeURIComponent(slug)}`,
-              { method: "POST", body: form }
+            const init = await apiJson<{ uploadId: string; key: string; kind: "video" | "audio" }>(
+              "/api/builder/media/upload/multipart/init",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ slug, mime: file.type, fileName: file.name, size: file.size }),
+              }
             );
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.error ?? "Upload failed.");
+            key = init.key;
+            uploadId = init.uploadId;
+
+            const totalParts = Math.max(1, Math.ceil(file.size / MEDIA_CHUNK_BYTES));
+            const parts: { partNumber: number; etag: string }[] = [];
+            for (let i = 0; i < totalParts; i++) {
+              const chunk = file.slice(i * MEDIA_CHUNK_BYTES, (i + 1) * MEDIA_CHUNK_BYTES);
+              const part = await apiJson<{ partNumber: number; etag: string }>(
+                `/api/builder/media/upload/multipart/part?slug=${encodeURIComponent(slug)}&key=${encodeURIComponent(key)}&uploadId=${encodeURIComponent(uploadId)}&partNumber=${i + 1}`,
+                { method: "POST", body: chunk }
+              );
+              parts.push(part);
+              onProgress?.(Math.round(((i + 1) / totalParts) * 100));
+            }
+
+            const data = await apiJson<{ asset: MediaAsset }>(
+              "/api/builder/media/upload/multipart/complete",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  slug,
+                  key,
+                  uploadId,
+                  parts,
+                  kind: init.kind,
+                  name: name || file.name.replace(/\.[^.]+$/, ""),
+                  mime: file.type,
+                }),
+              }
+            );
             set((s) => ({ mediaAssets: [data.asset, ...s.mediaAssets] }));
-            return { ok: true, asset: data.asset as MediaAsset };
+            return { ok: true, asset: data.asset };
           } catch (e) {
+            if (key && uploadId) {
+              fetch("/api/builder/media/upload/multipart/abort", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ slug, key, uploadId }),
+              }).catch(() => {});
+            }
             return { ok: false, error: e instanceof Error ? e.message : "Upload failed." };
           }
         },
