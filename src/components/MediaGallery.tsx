@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { MediaItem } from "@/data/runOfShow";
+import { VIDEO_PLACEHOLDER_POSTER } from "@/data/media";
 
 export function MediaGallery({ items }: { items: MediaItem[] }) {
   const [open, setOpen] = useState<number | null>(null);
@@ -21,10 +22,14 @@ export function MediaGallery({ items }: { items: MediaItem[] }) {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={m.type === "video" ? m.poster : m.src}
+              src={(m.type === "video" ? m.poster : m.src) || VIDEO_PLACEHOLDER_POSTER}
               alt={m.label ?? ""}
               loading="lazy"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = VIDEO_PLACEHOLDER_POSTER;
+              }}
             />
             {m.type === "video" && (
               <span className="absolute inset-0 flex items-center justify-center">
@@ -41,6 +46,14 @@ export function MediaGallery({ items }: { items: MediaItem[] }) {
                     }}
                   />
                 </span>
+              </span>
+            )}
+            {m.label && (
+              <span
+                className="absolute bottom-0 left-0 right-0 px-1.5 py-1 text-[10px] text-white truncate text-left"
+                style={{ background: "linear-gradient(to top, rgba(0,0,0,0.75), transparent)" }}
+              >
+                {m.label}
               </span>
             )}
           </button>

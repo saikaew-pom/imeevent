@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { eventMeta, whySpacingWorks, Beat } from "@/data/runOfShow";
+import { VIDEO_PLACEHOLDER_POSTER } from "@/data/media";
 import { allActsList, findAct, Act, NewActInput } from "@/data/acts";
 import { Talent, NewTalentInput } from "@/data/talent";
 import { EnergyCurve, CurvePoint } from "@/components/EnergyCurve";
@@ -729,9 +730,13 @@ function BeatDrawer({
                     <div key={i} className="relative panel-2 overflow-hidden">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={m.type === "video" ? m.poster : m.src}
+                        src={(m.type === "video" ? m.poster : m.src) || VIDEO_PLACEHOLDER_POSTER}
                         alt={m.label ?? ""}
                         className="w-full h-14 object-cover opacity-70"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = VIDEO_PLACEHOLDER_POSTER;
+                        }}
                       />
                       <div className="absolute inset-0 flex items-center justify-center gap-1.5 opacity-0 hover:opacity-100 transition-opacity" style={{ background: "rgba(10,15,13,0.6)" }}>
                         {m.type === "image" && (
