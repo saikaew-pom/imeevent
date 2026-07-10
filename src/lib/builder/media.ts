@@ -18,6 +18,7 @@ function rowToAsset(row: MediaRow): MediaAsset {
     kind: row.kind,
     name: row.name,
     url: `/api/builder/photo/${row.fileKey}`,
+    fileKey: row.fileKey,
     posterUrl: row.posterKey ? `/api/builder/photo/${row.posterKey}` : null,
     mime: row.mime,
     createdAt: row.createdAt,

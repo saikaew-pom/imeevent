@@ -29,6 +29,7 @@ export interface Beat {
   gallery?: MediaItem[];
   links?: BeatLink[];
   refVideos?: string[]; // unlimited pasted YouTube/Vimeo reference links
+  linkedTalent?: string[]; // talent entity ids (MC, band, performers, vendors)
   custom?: boolean; // true if added by the user in the planner (not the original run of show)
 }
 

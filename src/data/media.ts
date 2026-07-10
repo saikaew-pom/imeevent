@@ -8,6 +8,9 @@ export interface MediaAsset {
   kind: MediaAssetKind;
   name: string;
   url: string; // served via /api/builder/photo/<file_key>
+  fileKey: string; // raw R2 key — same value embedded in `url`, exposed so
+  // callers (e.g. attaching this asset's photo to a talent record) can
+  // reference the file directly without string-parsing the URL.
   posterUrl: string | null; // for video, if a poster was supplied
   mime: string | null;
   createdAt: string;

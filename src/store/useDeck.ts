@@ -11,6 +11,7 @@ import { Slide } from "@/data/slides";
 import { ProjectTask, NewTaskInput, ProjectMember } from "@/data/tasks";
 import { ProjectDocument, NewDocumentInput, SuggestedTask } from "@/data/documents";
 import { MediaAsset } from "@/data/media";
+import { Talent, NewTalentInput } from "@/data/talent";
 
 export interface LineupItem {
   uid: string;
@@ -73,6 +74,8 @@ interface DeckState {
   documentsLoaded: boolean;
   mediaAssets: MediaAsset[];
   mediaAssetsLoaded: boolean;
+  talentList: Talent[];
+  talentLoaded: boolean;
 
   addAct: (slot: Placement, actId: string) => void;
   removeItem: (uid: string) => void;
@@ -101,7 +104,7 @@ interface DeckState {
     slug: string,
     input: NewActInput,
     baseActId?: string
-  ) => Promise<{ ok: boolean; error?: string }>;
+  ) => Promise<{ ok: boolean; act?: Act; error?: string }>;
   updateCustomAct: (
     slug: string,
     id: string,
@@ -119,6 +122,7 @@ interface DeckState {
   removeProgramBeat: (id: string) => void;
   reorderProgram: (ids: string[]) => void;
   setBeatActs: (id: string, actIds: string[]) => void;
+  setBeatTalent: (id: string, talentIds: string[]) => void;
   resetProgram: () => void;
 
   // Presentation slides — one per Event Flow beat, drafted via MiniMax AI
@@ -181,6 +185,16 @@ interface DeckState {
   setBeatKeyVisual: (beatId: string, url: string) => void;
   addRefVideo: (beatId: string, url: string) => void;
   removeRefVideo: (beatId: string, index: number) => void;
+
+  // Talent references (MC, band, performers, vendors) — reusable per project.
+  hydrateTalent: (slug: string) => Promise<void>;
+  addTalent: (slug: string, input: NewTalentInput) => Promise<{ ok: boolean; talent?: Talent; error?: string }>;
+  updateTalent: (
+    slug: string,
+    id: string,
+    input: NewTalentInput
+  ) => Promise<{ ok: boolean; error?: string }>;
+  removeTalent: (slug: string, id: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 export const useDeck = create<DeckState>()(
@@ -215,6 +229,8 @@ export const useDeck = create<DeckState>()(
         documentsLoaded: false,
         mediaAssets: [],
         mediaAssetsLoaded: false,
+        talentList: [],
+        talentLoaded: false,
 
         addAct: (slot, actId) => {
           if (!isWritable(get().myRole)) return;
@@ -406,7 +422,7 @@ export const useDeck = create<DeckState>()(
                 ? [...s.customActs.filter((a) => a.id !== data.act.id), data.act]
                 : [...s.customActs, data.act],
             }));
-            return { ok: true };
+            return { ok: true, act: data.act };
           } catch (e) {
             return { ok: false, error: e instanceof Error ? e.message : "Failed to add item." };
           }
@@ -525,6 +541,14 @@ export const useDeck = create<DeckState>()(
           if (!isWritable(get().myRole)) return;
           set((s) => ({
             program: s.program.map((b) => (b.id === id ? { ...b, linkedActs: actIds } : b)),
+          }));
+          persistProgram();
+        },
+
+        setBeatTalent: (id, talentIds) => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => ({
+            program: s.program.map((b) => (b.id === id ? { ...b, linkedTalent: talentIds } : b)),
           }));
           persistProgram();
         },
@@ -822,6 +846,66 @@ export const useDeck = create<DeckState>()(
             refVideos: (beat.refVideos ?? []).filter((_, i) => i !== index),
           });
         },
+
+        hydrateTalent: async (slug) => {
+          try {
+            const data = await apiJson<{ role: ProjectRole; talent: Talent[] }>(
+              `/api/builder/talent?slug=${encodeURIComponent(slug)}`
+            );
+            set({ talentList: data.talent, myRole: data.role, talentLoaded: true });
+          } catch {
+            set({ talentLoaded: true });
+          }
+        },
+
+        addTalent: async (slug, input) => {
+          try {
+            const data = await apiJson<{ talent: Talent }>("/api/builder/talent", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug, input }),
+            });
+            set((s) => ({ talentList: [...s.talentList, data.talent] }));
+            return { ok: true, talent: data.talent };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Failed to add talent." };
+          }
+        },
+
+        updateTalent: async (slug, id, input) => {
+          try {
+            await apiJson(`/api/builder/talent/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug, input }),
+            });
+            await get().hydrateTalent(slug);
+            return { ok: true };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Failed to save talent." };
+          }
+        },
+
+        removeTalent: async (slug, id) => {
+          try {
+            await apiJson(`/api/builder/talent/${id}`, {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug }),
+            });
+            set((s) => ({
+              talentList: s.talentList.filter((t) => t.id !== id),
+              program: s.program.map((b) => ({
+                ...b,
+                linkedTalent: b.linkedTalent?.filter((tid) => tid !== id),
+              })),
+            }));
+            persistProgram();
+            return { ok: true };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Failed to remove talent." };
+          }
+        },
       };
     },
     {
@@ -850,6 +934,8 @@ export const useDeck = create<DeckState>()(
           documentsLoaded,
           mediaAssets,
           mediaAssetsLoaded,
+          talentList,
+          talentLoaded,
           ...rest
         } = state;
         void customActs;
@@ -870,6 +956,8 @@ export const useDeck = create<DeckState>()(
         void documentsLoaded;
         void mediaAssets;
         void mediaAssetsLoaded;
+        void talentList;
+        void talentLoaded;
         return rest;
       },
       // v1: ensure VVIP tier exists. v2: ensure customActs/program exist for

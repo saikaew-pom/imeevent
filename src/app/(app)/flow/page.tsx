@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import { eventMeta, whySpacingWorks, Beat } from "@/data/runOfShow";
-import { allActsList, findAct, Act } from "@/data/acts";
+import { allActsList, findAct, Act, NewActInput } from "@/data/acts";
+import { Talent, NewTalentInput } from "@/data/talent";
 import { EnergyCurve, CurvePoint } from "@/components/EnergyCurve";
 import { MediaGallery } from "@/components/MediaGallery";
 import { MediaPicker } from "@/components/media/MediaPicker";
+import { ItemFormModal } from "@/components/builder/ItemFormModal";
+import { TalentFormModal } from "@/components/timeline/TalentFormModal";
 import { liveBeatEnergy } from "@/lib/programEnergy";
 import { energyColor } from "@/lib/format";
 import { useDeck } from "@/store/useDeck";
@@ -353,20 +356,28 @@ function BeatDrawer({
 }) {
   const beat = useDeck((s) => s.program.find((b) => b.id === beatId));
   const customActs = useDeck((s) => s.customActs);
+  const talentList = useDeck((s) => s.talentList);
   const updateProgramBeat = useDeck((s) => s.updateProgramBeat);
   const removeProgramBeat = useDeck((s) => s.removeProgramBeat);
   const setBeatActs = useDeck((s) => s.setBeatActs);
+  const setBeatTalent = useDeck((s) => s.setBeatTalent);
   const addBeatGalleryItem = useDeck((s) => s.addBeatGalleryItem);
   const removeBeatGalleryItem = useDeck((s) => s.removeBeatGalleryItem);
   const setBeatKeyVisual = useDeck((s) => s.setBeatKeyVisual);
   const addRefVideo = useDeck((s) => s.addRefVideo);
   const removeRefVideo = useDeck((s) => s.removeRefVideo);
+  const addCustomAct = useDeck((s) => s.addCustomAct);
+  const addTalent = useDeck((s) => s.addTalent);
   const myRole = useDeck((s) => s.myRole);
   const canWrite = myRole === "owner" || myRole === "editor";
 
   const [addingActId, setAddingActId] = useState("");
+  const [addingDecorId, setAddingDecorId] = useState("");
+  const [addingTalentId, setAddingTalentId] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [newVideoUrl, setNewVideoUrl] = useState("");
+  const [newItemKind, setNewItemKind] = useState<"show" | "decor" | null>(null);
+  const [newTalentOpen, setNewTalentOpen] = useState(false);
 
   if (!beat) return null; // deleted mid-edit
 
@@ -375,6 +386,15 @@ function BeatDrawer({
     .filter((a): a is Act => Boolean(a));
   const showLibrary = allActsList(customActs).filter(
     (a) => a.kind === "show" && !(beat.linkedActs ?? []).includes(a.id)
+  );
+  const decorLibrary = allActsList(customActs).filter(
+    (a) => a.kind === "decor" && !(beat.linkedActs ?? []).includes(a.id)
+  );
+  const linkedTalent = (beat.linkedTalent ?? [])
+    .map((id) => talentList.find((t) => t.id === id))
+    .filter((t): t is Talent => Boolean(t));
+  const talentLibrary = talentList.filter(
+    (t) => !(beat.linkedTalent ?? []).includes(t.id)
   );
 
   const addShow = (id: string) => {
@@ -387,6 +407,35 @@ function BeatDrawer({
       beat.id,
       (beat.linkedActs ?? []).filter((x) => x !== id)
     );
+  };
+  const addDecor = (id: string) => {
+    if (!id) return;
+    setBeatActs(beat.id, [...(beat.linkedActs ?? []), id]);
+    setAddingDecorId("");
+  };
+  const addTalentLink = (id: string) => {
+    if (!id) return;
+    setBeatTalent(beat.id, [...(beat.linkedTalent ?? []), id]);
+    setAddingTalentId("");
+  };
+  const removeTalentLink = (id: string) => {
+    setBeatTalent(beat.id, (beat.linkedTalent ?? []).filter((x) => x !== id));
+  };
+
+  const handleNewItem = async (input: NewActInput) => {
+    const result = await addCustomAct(PROJECT_SLUG, input);
+    if (result.ok && result.act) {
+      setBeatActs(beat.id, [...(beat.linkedActs ?? []), result.act.id]);
+    }
+    return result;
+  };
+
+  const handleNewTalent = async (input: NewTalentInput) => {
+    const result = await addTalent(PROJECT_SLUG, input);
+    if (result.ok && result.talent) {
+      setBeatTalent(beat.id, [...(beat.linkedTalent ?? []), result.talent.id]);
+    }
+    return result;
   };
 
   const planner = view === "planner";
@@ -626,12 +675,116 @@ function BeatDrawer({
           />
         )}
 
-        {beat.links && beat.links.length > 0 && (
-          <div className="mb-5">
-            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-2">
-              Talent references
+        {newItemKind && (
+          <ItemFormModal
+            defaultKind={newItemKind}
+            onClose={() => setNewItemKind(null)}
+            onSubmit={handleNewItem}
+          />
+        )}
+
+        {newTalentOpen && (
+          <TalentFormModal onClose={() => setNewTalentOpen(false)} onSubmit={handleNewTalent} />
+        )}
+
+        {/* Talent — reusable entity, pick from the project or create inline */}
+        <div className="mb-5">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">
+              Talent
+            </span>
+            {planner && canWrite && (
+              <button
+                onClick={() => setNewTalentOpen(true)}
+                className="text-[11px] emerald-text hover:underline"
+              >
+                + New talent
+              </button>
+            )}
+          </div>
+
+          {linkedTalent.length > 0 && (
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              {linkedTalent.map((t) => (
+                <div key={t.id} className="panel-2 overflow-hidden relative flex gap-2 p-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={t.photoUrl ?? "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect width='100%25' height='100%25' fill='%23182620'/%3E%3C/svg%3E"}
+                    alt={t.name}
+                    className="w-10 h-10 rounded-full object-cover shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12px] font-semibold truncate">{t.name}</div>
+                    <div className="text-[10px] text-[var(--text-faint)] truncate">
+                      {t.role || "Talent"}
+                    </div>
+                    <div className="flex gap-2 mt-0.5">
+                      {t.videoUrl && (
+                        <a
+                          href={t.videoUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] emerald-text hover:underline"
+                        >
+                          ▷ video
+                        </a>
+                      )}
+                      {t.linkUrl && (
+                        <a
+                          href={t.linkUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] emerald-text hover:underline"
+                        >
+                          ↗ link
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  {planner && canWrite && (
+                    <button
+                      onClick={() => removeTalentLink(t.id)}
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center text-[11px]"
+                      style={{ background: "rgba(10,15,13,0.75)", color: "var(--danger)" }}
+                      title="Remove from this program"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
-            <div className="flex flex-wrap gap-2">
+          )}
+
+          {planner && canWrite && (
+            <div className="flex gap-2">
+              <select
+                value={addingTalentId}
+                onChange={(e) => setAddingTalentId(e.target.value)}
+                className="flex-1"
+              >
+                <option value="">
+                  {talentLibrary.length ? "Add talent…" : "No more talent to add"}
+                </option>
+                {talentLibrary.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} {t.role ? `(${t.role})` : ""}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => addTalentLink(addingTalentId)}
+                disabled={!addingTalentId}
+                className="btn btn-emerald py-1.5 px-3 text-[12.5px] disabled:opacity-40"
+              >
+                + Add
+              </button>
+            </div>
+          )}
+
+          {/* Legacy freeform quick-links, kept for older seeded beats */}
+          {beat.links && beat.links.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
               {beat.links.map((l) => (
                 <a
                   key={l.url}
@@ -644,13 +797,15 @@ function BeatDrawer({
                 </a>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* Linked shows — editable picker in planner view */}
+        {/* Linked shows + decor — editable pickers in planner view */}
         <div className="mb-5">
-          <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-2">
-            {planner ? "Shows — pick from the builder" : "Linked acts"}
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">
+              {planner ? "Shows & decor — pick from the builder" : "Linked items"}
+            </span>
           </div>
           {linkedActs.length > 0 && (
             <div className="grid grid-cols-2 gap-2 mb-2">
@@ -665,7 +820,7 @@ function BeatDrawer({
                   <div className="px-2.5 py-2">
                     <div className="text-[12px] font-semibold truncate">{a.name}</div>
                     <div className="text-[10px] text-[var(--text-faint)]">
-                      {a.energyLabel} · {a.type}
+                      {a.kind === "decor" ? "Decor" : a.energyLabel} · {a.type}
                     </div>
                   </div>
                   {planner && canWrite && (
@@ -683,28 +838,65 @@ function BeatDrawer({
             </div>
           )}
           {planner && canWrite && (
-            <div className="flex gap-2">
-              <select
-                value={addingActId}
-                onChange={(e) => setAddingActId(e.target.value)}
-                className="flex-1"
-              >
-                <option value="">
-                  {showLibrary.length ? "Add a show…" : "No more shows to add"}
-                </option>
-                {showLibrary.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} ({a.energyLabel})
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <select
+                  value={addingActId}
+                  onChange={(e) => setAddingActId(e.target.value)}
+                  className="flex-1"
+                >
+                  <option value="">
+                    {showLibrary.length ? "Add a show…" : "No more shows to add"}
                   </option>
-                ))}
-              </select>
-              <button
-                onClick={() => addShow(addingActId)}
-                disabled={!addingActId}
-                className="btn btn-emerald py-1.5 px-3 text-[12.5px] disabled:opacity-40"
-              >
-                + Add
-              </button>
+                  {showLibrary.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.energyLabel})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => addShow(addingActId)}
+                  disabled={!addingActId}
+                  className="btn btn-emerald py-1.5 px-3 text-[12.5px] disabled:opacity-40"
+                >
+                  + Add
+                </button>
+                <button
+                  onClick={() => setNewItemKind("show")}
+                  className="btn py-1.5 px-3 text-[12.5px] whitespace-nowrap"
+                >
+                  + New show
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={addingDecorId}
+                  onChange={(e) => setAddingDecorId(e.target.value)}
+                  className="flex-1"
+                >
+                  <option value="">
+                    {decorLibrary.length ? "Add decor…" : "No more decor to add"}
+                  </option>
+                  {decorLibrary.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => addDecor(addingDecorId)}
+                  disabled={!addingDecorId}
+                  className="btn btn-emerald py-1.5 px-3 text-[12.5px] disabled:opacity-40"
+                >
+                  + Add
+                </button>
+                <button
+                  onClick={() => setNewItemKind("decor")}
+                  className="btn py-1.5 px-3 text-[12.5px] whitespace-nowrap"
+                >
+                  + New decor
+                </button>
+              </div>
             </div>
           )}
         </div>

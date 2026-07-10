@@ -17,14 +17,16 @@ const PROJECT_SLUG = "jw-gala-garden-night";
 
 export function ItemFormModal({
   initial,
+  defaultKind,
   onClose,
   onSubmit,
 }: {
   initial?: Act; // present when editing an existing custom item
+  defaultKind?: ItemKind; // preset the kind toggle when creating fresh (e.g. from the beat drawer)
   onClose: () => void;
   onSubmit: (input: NewActInput) => Promise<{ ok: boolean; error?: string }>;
 }) {
-  const [kind, setKind] = useState<ItemKind>(initial?.kind ?? "show");
+  const [kind, setKind] = useState<ItemKind>(initial?.kind ?? defaultKind ?? "show");
   const [name, setName] = useState(initial?.name ?? "");
   const [type, setType] = useState(initial?.type ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
