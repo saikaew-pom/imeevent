@@ -15,6 +15,23 @@ import { liveBeatEnergy } from "@/lib/programEnergy";
 import { energyColor } from "@/lib/format";
 import { useDeck } from "@/store/useDeck";
 import { toEmbedUrl, toVideoThumb } from "@/lib/embed";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  sortableKeyboardCoordinates,
+  arrayMove,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 const PROJECT_SLUG = "jw-gala-garden-night";
 
@@ -54,6 +71,20 @@ export default function FlowPage() {
     const next = [...program];
     [next[index], next[target]] = [next[target], next[index]];
     reorderProgram(next.map((b) => b.id));
+  };
+
+  const dragSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const oldIndex = program.findIndex((b) => b.id === active.id);
+    const newIndex = program.findIndex((b) => b.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    reorderProgram(arrayMove(program, oldIndex, newIndex).map((b) => b.id));
   };
 
   const toggle = (id: string) =>
@@ -153,25 +184,36 @@ export default function FlowPage() {
       </section>
 
       {/* Timeline */}
-      <section className="grid gap-2.5 mt-4">
-        {program.map((b, i) => (
-          <BeatRow
-            key={b.id}
-            beat={b}
-            view={view}
-            canWrite={canWrite}
-            customActs={customActs}
-            expanded={expanded.has(b.id)}
-            onToggle={() => toggle(b.id)}
-            onDetails={() => setSelected(b.id)}
-            isFirst={i === 0}
-            isLast={i === program.length - 1}
-            onMoveUp={() => moveBeat(i, -1)}
-            onMoveDown={() => moveBeat(i, 1)}
-            onDelete={() => removeProgramBeat(b.id)}
-          />
-        ))}
-      </section>
+      <DndContext
+        sensors={dragSensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={program.map((b) => b.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <section className="grid gap-2.5 mt-4">
+            {program.map((b, i) => (
+              <BeatRow
+                key={b.id}
+                beat={b}
+                view={view}
+                canWrite={canWrite}
+                customActs={customActs}
+                expanded={expanded.has(b.id)}
+                onToggle={() => toggle(b.id)}
+                onDetails={() => setSelected(b.id)}
+                isFirst={i === 0}
+                isLast={i === program.length - 1}
+                onMoveUp={() => moveBeat(i, -1)}
+                onMoveDown={() => moveBeat(i, 1)}
+                onDelete={() => removeProgramBeat(b.id)}
+              />
+            ))}
+          </section>
+        </SortableContext>
+      </DndContext>
 
       {view === "planner" && canWrite && (
         <button
@@ -270,10 +312,24 @@ function BeatRow({
       : undefined);
   const thumbIsVideo = !beat.media?.photo && firstGalleryItem?.type === "video";
 
+  const dragEnabled = view === "planner" && canWrite;
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: beat.id,
+    disabled: !dragEnabled,
+  });
+
   return (
     <div
+      ref={setNodeRef}
       className="panel overflow-hidden transition-colors"
-      style={{ borderColor: beat.peak ? "rgba(217,180,90,0.4)" : "var(--border-soft)" }}
+      style={{
+        borderColor: beat.peak ? "rgba(217,180,90,0.4)" : "var(--border-soft)",
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.6 : 1,
+        position: "relative",
+        zIndex: isDragging ? 20 : undefined,
+      }}
     >
       <button
         onClick={hasDropdown ? onToggle : onDetails}
@@ -353,6 +409,19 @@ function BeatRow({
         )}
         {view === "planner" && canWrite && (
           <div className="flex items-center gap-1 shrink-0">
+            <span
+              {...attributes}
+              {...listeners}
+              onClick={(e) => e.stopPropagation()}
+              className="text-[13px] shrink-0 touch-none hover:text-[var(--gold-bright)]"
+              style={{
+                color: "var(--text-faint)",
+                cursor: isDragging ? "grabbing" : "grab",
+              }}
+              title="Drag to reorder"
+            >
+              ⠿
+            </span>
             <span
               role="button"
               aria-disabled={isFirst}
