@@ -38,7 +38,7 @@ export async function DELETE(
   const removed = await deleteMediaAsset(access.project.id, id);
   if (removed) {
     const bucket = await getPhotosBucket();
-    await bucket.delete(removed.fileKey).catch(() => {});
+    if (removed.fileKey) await bucket.delete(removed.fileKey).catch(() => {});
     if (removed.posterKey) await bucket.delete(removed.posterKey).catch(() => {});
   }
   return NextResponse.json({ ok: true });

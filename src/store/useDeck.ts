@@ -201,6 +201,15 @@ interface DeckState {
   ) => Promise<{ ok: boolean; asset?: MediaAsset; error?: string }>;
   renameMediaAsset: (slug: string, id: string, name: string) => Promise<{ ok: boolean }>;
   removeMediaAsset: (slug: string, id: string) => Promise<{ ok: boolean }>;
+  addMediaLink: (
+    slug: string,
+    url: string,
+    name?: string
+  ) => Promise<{ ok: boolean; asset?: MediaAsset; error?: string }>;
+  searchMediaAssetsAI: (
+    slug: string,
+    query: string
+  ) => Promise<{ ok: boolean; ids?: string[]; error?: string }>;
 
   // Beat-level media: gallery items, the featured key visual, and unlimited
   // pasted reference-video links. All go through updateProgramBeat so they
@@ -997,6 +1006,33 @@ export const useDeck = create<DeckState>()(
             return { ok: true };
           } catch {
             return { ok: false };
+          }
+        },
+
+        addMediaLink: async (slug, url, name) => {
+          try {
+            const data = await apiJson<{ asset: MediaAsset }>("/api/builder/media/link", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug, url, name }),
+            });
+            set((s) => ({ mediaAssets: [data.asset, ...s.mediaAssets] }));
+            return { ok: true, asset: data.asset };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Failed to add link." };
+          }
+        },
+
+        searchMediaAssetsAI: async (slug, query) => {
+          try {
+            const data = await apiJson<{ ids: string[] }>("/api/builder/media/search", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug, query }),
+            });
+            return { ok: true, ids: data.ids };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "AI search failed." };
           }
         },
 

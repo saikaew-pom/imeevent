@@ -8,6 +8,7 @@ interface MediaRow {
   name: string;
   fileKey: string;
   posterKey: string | null;
+  linkUrl: string | null;
   mime: string | null;
   createdAt: string;
 }
@@ -17,9 +18,10 @@ function rowToAsset(row: MediaRow): MediaAsset {
     id: row.id,
     kind: row.kind,
     name: row.name,
-    url: `/api/builder/photo/${row.fileKey}`,
+    url: row.fileKey ? `/api/builder/photo/${row.fileKey}` : "",
     fileKey: row.fileKey,
     posterUrl: row.posterKey ? `/api/builder/photo/${row.posterKey}` : null,
+    linkUrl: row.linkUrl,
     mime: row.mime,
     createdAt: row.createdAt,
   };
@@ -29,8 +31,8 @@ export async function listMediaAssets(projectId: string): Promise<MediaAsset[]> 
   const db = await getDB();
   const { results } = await db
     .prepare(
-      `SELECT id, kind, name, file_key as fileKey, poster_key as posterKey, mime,
-              created_at as createdAt
+      `SELECT id, kind, name, file_key as fileKey, poster_key as posterKey,
+              link_url as linkUrl, mime, created_at as createdAt
        FROM media_assets WHERE project_id = ? ORDER BY created_at DESC`
     )
     .bind(projectId)
@@ -41,14 +43,21 @@ export async function listMediaAssets(projectId: string): Promise<MediaAsset[]> 
 export async function createMediaAsset(
   projectId: string,
   createdBy: string,
-  input: { kind: MediaAssetKind; name: string; fileKey: string; posterKey?: string | null; mime?: string | null }
+  input: {
+    kind: MediaAssetKind;
+    name: string;
+    fileKey: string;
+    posterKey?: string | null;
+    linkUrl?: string | null;
+    mime?: string | null;
+  }
 ): Promise<MediaAsset> {
   const db = await getDB();
   const id = crypto.randomUUID();
   await db
     .prepare(
-      `INSERT INTO media_assets (id, project_id, kind, name, file_key, poster_key, mime, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO media_assets (id, project_id, kind, name, file_key, poster_key, link_url, mime, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id,
@@ -57,6 +66,7 @@ export async function createMediaAsset(
       input.name.trim() || "Untitled",
       input.fileKey,
       input.posterKey ?? null,
+      input.linkUrl ?? null,
       input.mime ?? null,
       createdBy
     )
@@ -67,6 +77,7 @@ export async function createMediaAsset(
     name: input.name.trim() || "Untitled",
     fileKey: input.fileKey,
     posterKey: input.posterKey ?? null,
+    linkUrl: input.linkUrl ?? null,
     mime: input.mime ?? null,
     createdAt: new Date().toISOString(),
   });

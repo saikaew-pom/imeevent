@@ -1,17 +1,19 @@
 // Project media library — uploaded photos/clips reusable across beats,
 // talent, and shows. Pure data types (no "server-only" imports) so both the
 // client store and server-side query code can share them.
-export type MediaAssetKind = "image" | "video" | "audio";
+export type MediaAssetKind = "image" | "video" | "audio" | "link";
 
 export interface MediaAsset {
   id: string;
   kind: MediaAssetKind;
   name: string;
-  url: string; // served via /api/builder/photo/<file_key>
+  url: string; // served via /api/builder/photo/<file_key> — empty for kind "link"
   fileKey: string; // raw R2 key — same value embedded in `url`, exposed so
   // callers (e.g. attaching this asset's photo to a talent record) can
-  // reference the file directly without string-parsing the URL.
+  // reference the file directly without string-parsing the URL. Empty
+  // string for kind "link" (no uploaded file, see linkUrl instead).
   posterUrl: string | null; // for video, if a poster was supplied
+  linkUrl: string | null; // for kind "link" — the pasted reference URL
   mime: string | null;
   createdAt: string;
 }
