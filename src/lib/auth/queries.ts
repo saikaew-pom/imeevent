@@ -1,6 +1,8 @@
 import "server-only";
 import { getDB } from "@/lib/cf";
 import { hashPassword } from "./password";
+import { getProjectState, setProjectState, STATE_KEYS } from "@/lib/builder/projectState";
+import type { Beat } from "@/data/runOfShow";
 
 export type Role = "owner" | "editor" | "viewer";
 export type CompanyRole = "admin" | "member";
@@ -157,6 +159,225 @@ export async function createProject(input: {
     passcode: null,
     eventDate: null,
     companyId: input.companyId,
+    archivedAt: null,
+  };
+}
+
+// Clones a project's full builder content into a brand-new project in the
+// same company: custom acts (kept at the same id — its PK is already
+// project-scoped so no collision is possible), talent/media/tasks/documents
+// (each given a fresh id, since those tables key on a bare global `id`), and
+// every project_state blob (lineup/program/financials/presentation/
+// hiddenSlides/meta). The "program" blob's Beat.linkedTalent ids are the one
+// place a talent id is referenced from outside the talent table itself, so
+// they're rewritten through the old->new id map built while copying talent —
+// every other cross-reference (custom_acts ids in linkedActs/lineup, beat ids
+// in presentation slides, literal media URLs in gallery/keyVisual/refVideos)
+// already stays valid because it's either copied as-is or keyed by the
+// unchanged id. The copy starts with no passcode (guest access is a
+// per-event secret, never silently duplicated) and no members besides the
+// acting user as owner — mirrors createProject's "creator becomes owner"
+// convention rather than copying the source project's whole team across.
+export async function duplicateProject(
+  sourceProjectId: string,
+  ownerId: string,
+  newName: string
+): Promise<ProjectRow> {
+  const db = await getDB();
+  const source = await getProjectById(sourceProjectId);
+  if (!source) throw new Error("Project not found.");
+  if (!source.companyId) throw new Error("Source project has no company.");
+
+  const name = newName.trim() || `${source.name} (Copy)`;
+  const base = slugify(name);
+  let slug = base;
+  let n = 1;
+  while (await getProjectBySlug(slug)) {
+    n += 1;
+    slug = `${base}-${n}`;
+  }
+
+  const id = newId();
+  await db
+    .prepare("INSERT INTO projects (id, slug, name, event_date, company_id) VALUES (?, ?, ?, ?, ?)")
+    .bind(id, slug, name, source.eventDate, source.companyId)
+    .run();
+  await addProjectMember(id, ownerId, "owner");
+
+  // custom_acts: composite (project_id, id) PK — same id is safe under a
+  // different project_id, so a plain INSERT...SELECT copies every row.
+  await db
+    .prepare(
+      `INSERT INTO custom_acts
+        (id, project_id, kind, name, type, description, themes, requires_dark,
+         duration_min, cost_thb, photo, placement, energy, energy_label, is_override, created_by)
+       SELECT id, ?, kind, name, type, description, themes, requires_dark,
+              duration_min, cost_thb, photo, placement, energy, energy_label, is_override, created_by
+       FROM custom_acts WHERE project_id = ?`
+    )
+    .bind(id, sourceProjectId)
+    .run();
+
+  // talent: bare `id` PK — needs a fresh id per row, so loop (same "fine for
+  // a handful of rows" tradeoff as createTasksBulk elsewhere in this file).
+  const { results: talentRows } = await db
+    .prepare(
+      `SELECT id, name, role, description, photo_key as photoKey, video_url as videoUrl,
+              link_url as linkUrl, created_by as createdBy
+       FROM talent WHERE project_id = ?`
+    )
+    .bind(sourceProjectId)
+    .all<{
+      id: string;
+      name: string;
+      role: string;
+      description: string;
+      photoKey: string | null;
+      videoUrl: string | null;
+      linkUrl: string | null;
+      createdBy: string | null;
+    }>();
+  const talentIdMap = new Map<string, string>();
+  for (const row of talentRows) {
+    const talentId = newId();
+    talentIdMap.set(row.id, talentId);
+    await db
+      .prepare(
+        `INSERT INTO talent (id, project_id, name, role, description, photo_key, video_url, link_url, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(talentId, id, row.name, row.role, row.description, row.photoKey, row.videoUrl, row.linkUrl, row.createdBy)
+      .run();
+  }
+
+  // media_assets: fresh id per row too. Nothing references a media asset by
+  // id from outside this table (beat gallery/keyVisual/refVideos store the
+  // resolved /api/builder/photo/<file_key> URL directly), so no remap needed
+  // — this just repopulates the new project's own Media Library tab.
+  const { results: mediaRows } = await db
+    .prepare(
+      `SELECT id, kind, name, file_key as fileKey, poster_key as posterKey,
+              link_url as linkUrl, mime, created_by as createdBy
+       FROM media_assets WHERE project_id = ?`
+    )
+    .bind(sourceProjectId)
+    .all<{
+      id: string;
+      kind: string;
+      name: string;
+      fileKey: string;
+      posterKey: string | null;
+      linkUrl: string | null;
+      mime: string | null;
+      createdBy: string | null;
+    }>();
+  for (const row of mediaRows) {
+    await db
+      .prepare(
+        `INSERT INTO media_assets (id, project_id, kind, name, file_key, poster_key, link_url, mime, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(newId(), id, row.kind, row.name, row.fileKey, row.posterKey, row.linkUrl, row.mime, row.createdBy)
+      .run();
+  }
+
+  // project_tasks: fresh id per row; assignee_id references `users`, not the
+  // project, so it carries over unchanged (same assignee on the copy).
+  const { results: taskRows } = await db
+    .prepare(
+      `SELECT id, title, description, category, status, start_date as startDate,
+              due_date as dueDate, assignee_id as assigneeId, sort_order as sortOrder,
+              created_by as createdBy
+       FROM project_tasks WHERE project_id = ?`
+    )
+    .bind(sourceProjectId)
+    .all<{
+      id: string;
+      title: string;
+      description: string;
+      category: string;
+      status: string;
+      startDate: string | null;
+      dueDate: string | null;
+      assigneeId: string | null;
+      sortOrder: number;
+      createdBy: string | null;
+    }>();
+  for (const row of taskRows) {
+    await db
+      .prepare(
+        `INSERT INTO project_tasks
+          (id, project_id, title, description, category, status, start_date, due_date, assignee_id, sort_order, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        newId(),
+        id,
+        row.title,
+        row.description,
+        row.category,
+        row.status,
+        row.startDate,
+        row.dueDate,
+        row.assigneeId,
+        row.sortOrder,
+        row.createdBy
+      )
+      .run();
+  }
+
+  // project_documents: fresh id per row; the R2 file itself is immutable, so
+  // both projects' rows can point at the same file_key.
+  const { results: docRows } = await db
+    .prepare(
+      `SELECT id, name, kind, file_key as fileKey, text_content as textContent,
+              mime, created_by as createdBy
+       FROM project_documents WHERE project_id = ?`
+    )
+    .bind(sourceProjectId)
+    .all<{
+      id: string;
+      name: string;
+      kind: string;
+      fileKey: string | null;
+      textContent: string | null;
+      mime: string | null;
+      createdBy: string | null;
+    }>();
+  for (const row of docRows) {
+    await db
+      .prepare(
+        `INSERT INTO project_documents (id, project_id, name, kind, file_key, text_content, mime, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(newId(), id, row.name, row.kind, row.fileKey, row.textContent, row.mime, row.createdBy)
+      .run();
+  }
+
+  // project_state: copy every saved key; only "program" holds a talent
+  // reference, so it's the only one that needs id-remapping before saving.
+  const state = await getProjectState(sourceProjectId);
+  for (const key of STATE_KEYS) {
+    const data = state[key];
+    if (data === null || data === undefined) continue;
+    if (key === "program" && Array.isArray(data)) {
+      const remapped = (data as Beat[]).map((beat) => ({
+        ...beat,
+        linkedTalent: beat.linkedTalent?.map((talentId) => talentIdMap.get(talentId) ?? talentId),
+      }));
+      await setProjectState(id, key, remapped, ownerId);
+    } else {
+      await setProjectState(id, key, data, ownerId);
+    }
+  }
+
+  return {
+    id,
+    slug,
+    name,
+    passcode: null,
+    eventDate: source.eventDate,
+    companyId: source.companyId,
     archivedAt: null,
   };
 }

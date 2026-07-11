@@ -3,7 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
-import { createProject, setProjectEventDate, getPrimaryCompanyId } from "@/lib/auth/queries";
+import {
+  createProject,
+  setProjectEventDate,
+  getPrimaryCompanyId,
+  getProjectById,
+  isProjectMember,
+  isCompanyAdmin,
+  duplicateProject,
+} from "@/lib/auth/queries";
 import { setProjectState } from "@/lib/builder/projectState";
 import { createTasksBulk, BulkTaskInput } from "@/lib/builder/tasks";
 import { getEventPreset, offsetToDate } from "@/data/eventPresets";
@@ -155,4 +163,32 @@ export async function createProjectFromTemplateAction(formData: FormData) {
 
   revalidatePath("/projects");
   redirect(`/p/${project.slug}/dashboard`);
+}
+
+// Clones an existing project (lineup, program, financials, tasks, documents,
+// media, talent) into a new one, landing the caller on its dashboard. Scoped
+// to the project's own owner (or a company admin / super admin, same override
+// used for the admin dashboard's project actions) — an editor or viewer can't
+// spin off copies of a project they don't own.
+export async function duplicateProjectAction(formData: FormData) {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+
+  const projectId = String(formData.get("projectId") ?? "");
+  const project = await getProjectById(projectId);
+  if (!project) throw new Error("Project not found.");
+
+  const role = await isProjectMember(user.id, projectId);
+  const isCompanyOverride = project.companyId
+    ? user.isAdmin || (await isCompanyAdmin(user.id, project.companyId))
+    : user.isAdmin;
+  if (role !== "owner" && !isCompanyOverride) {
+    throw new Error("Only the project owner or a company admin can duplicate this project.");
+  }
+
+  const name = String(formData.get("name") ?? "").trim() || `${project.name} (Copy)`;
+  const copy = await duplicateProject(projectId, user.id, name);
+
+  revalidatePath("/projects");
+  redirect(`/p/${copy.slug}/dashboard`);
 }
