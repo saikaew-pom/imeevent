@@ -81,8 +81,8 @@ export default function Home() {
           </div>
           <p className="text-[15px] md:text-lg text-[var(--text-dim)] max-w-2xl leading-relaxed">
             An interactive command deck for your event — design the show, shape the
-            night&apos;s energy, and model the numbers, all from your run of show and a{" "}
-            {acts.length}-act entertainment catalogue.
+            night&apos;s energy, and model the numbers, all from your run of show
+            {slug === "jw-gala-garden-night" ? ` and a ${acts.length}-act entertainment catalogue.` : "."}
           </p>
           <div className="flex flex-wrap gap-3 mt-8">
             <Link href={`${base}/builder`} className="btn btn-gold">

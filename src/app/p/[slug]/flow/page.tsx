@@ -747,13 +747,14 @@ function BeatDrawer({
 
   if (!beat) return null; // deleted mid-edit
 
+  const isJW = PROJECT_SLUG === "jw-gala-garden-night";
   const linkedActs = (beat.linkedActs ?? [])
     .map((id) => findAct(id, customActs))
     .filter((a): a is Act => Boolean(a));
-  const showLibrary = allActsList(customActs).filter(
+  const showLibrary = allActsList(customActs, isJW).filter(
     (a) => a.kind === "show" && !(beat.linkedActs ?? []).includes(a.id)
   );
-  const decorLibrary = allActsList(customActs).filter(
+  const decorLibrary = allActsList(customActs, isJW).filter(
     (a) => a.kind === "decor" && !(beat.linkedActs ?? []).includes(a.id)
   );
   const linkedTalent = (beat.linkedTalent ?? [])

@@ -15,7 +15,11 @@ import Link from "next/link";
 import { useProjectSlug } from "@/components/ProjectProvider";
 
 export default function RevenuePage() {
-  const base = `/p/${useProjectSlug()}`;
+  const slug = useProjectSlug();
+  const base = `/p/${slug}`;
+  // The 2023–2025 historical benchmark is JW's own production actuals — it
+  // only means anything on JW's project.
+  const isJW = slug === "jw-gala-garden-night";
   const contentRef = useRef<HTMLDivElement>(null);
   const financials = useDeck((s) => s.financials);
   const setTier = useDeck((s) => s.setTier);
@@ -51,8 +55,9 @@ export default function RevenuePage() {
             Revenue Simulator
           </h1>
           <p className="text-[13px] text-[var(--text-dim)] mt-1 max-w-2xl">
-            Package revenue, cost by line item, and margin — benchmarked against the
-            2023–2025 actuals. Edit the full cost structure in the{" "}
+            Package revenue, cost by line item, and margin
+            {isJW ? " — benchmarked against the 2023–2025 actuals" : ""}. Edit the
+            full cost structure in the{" "}
             <Link href={`${base}/costing`} className="emerald-text hover:underline">
               Costing deep dive
             </Link>
@@ -67,7 +72,7 @@ export default function RevenuePage() {
           )}
           <ExportSaveButtons
             targetRef={contentRef}
-            filename="jw-gala-revenue.pdf"
+            filename={`${slug}-revenue.pdf`}
             canWrite={canWrite}
           />
         </div>
@@ -320,13 +325,16 @@ export default function RevenuePage() {
 
       <p className="text-[11px] text-[var(--text-faint)] mt-6">
         All figures are planning estimates. Package price/qty and the full cost
-        structure are editable; costs seed off the 2025 actuals.
+        structure are editable{isJW ? "; costs seed off the 2025 actuals." : "."}
       </p>
 
-      {/* Historical benchmark */}
-      <div className="mt-10 pt-8 border-t hairline">
-        <HistorySection />
-      </div>
+      {/* Historical benchmark — JW's own production actuals, not meaningful
+          for any other project until it has its own history. */}
+      {isJW && (
+        <div className="mt-10 pt-8 border-t hairline">
+          <HistorySection />
+        </div>
+      )}
     </div>
   );
 }

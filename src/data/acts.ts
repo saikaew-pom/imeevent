@@ -727,7 +727,11 @@ export function findAct(id: string, custom: Act[] = []): Act | undefined {
   return acts.find((a) => a.id === id);
 }
 
-export function allActsList(custom: Act[] = []): Act[] {
+// includeBuiltIn gates JW's own commissioned catalogue: only JW's project
+// should see it in a picker. Every other project builds its Show & Decor
+// list entirely from its own custom acts.
+export function allActsList(custom: Act[] = [], includeBuiltIn = true): Act[] {
+  if (!includeBuiltIn) return custom;
   const overrides = new Map(
     custom.filter((a) => a.overridden).map((a) => [a.id, a])
   );

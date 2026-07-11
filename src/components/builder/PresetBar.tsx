@@ -1,13 +1,14 @@
 "use client";
 
 import { useDeck } from "@/store/useDeck";
-import { THEME_LABELS, ThemeKey } from "@/data/acts";
+import { THEME_LABELS, ThemeKey, allActsList } from "@/data/acts";
 import {
   buildSuggestion,
   VIBE_LABELS,
   VibeLevel,
   signaturePresets,
 } from "@/data/presets";
+import { useProjectSlug } from "@/components/ProjectProvider";
 
 const themeOptions: (ThemeKey | "mixed")[] = [
   "mixed",
@@ -21,16 +22,21 @@ const themeOptions: (ThemeKey | "mixed")[] = [
 ];
 
 export function PresetBar() {
-  const { theme, vibe, numShows, setTheme, setVibe, setNumShows, applySuggestion, myRole } =
+  const { theme, vibe, numShows, setTheme, setVibe, setNumShows, applySuggestion, myRole, customActs } =
     useDeck();
   const canWrite = myRole === "owner" || myRole === "editor";
+  // The signature presets (and the "as booked" one by name) are calibrated to
+  // JW's own commissioned catalogue — suggesting from it only makes sense on
+  // JW's project. Every other project suggests only from its own acts.
+  const isJW = useProjectSlug() === "jw-gala-garden-night";
 
   const generate = (
     t = theme,
     v = vibe,
     n = numShows
   ) => {
-    const s = buildSuggestion(t, v, n);
+    const pool = allActsList(customActs, isJW);
+    const s = buildSuggestion(t, v, n, pool);
     applySuggestion(s.slots.map(({ slot, actId }) => ({ slot, actId })));
   };
 
@@ -101,28 +107,30 @@ export function PresetBar() {
         </button>
       </div>
 
-      <div className="mt-4 pt-4 border-t hairline">
-        <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-2">
-          Or start from a signature preset
+      {isJW && (
+        <div className="mt-4 pt-4 border-t hairline">
+          <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-2">
+            Or start from a signature preset
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {signaturePresets.map((p) => (
+              <button
+                key={p.id}
+                className="btn py-1.5 px-3 text-[12px] disabled:opacity-50"
+                disabled={!canWrite}
+                onClick={() => {
+                  setTheme(p.theme);
+                  setVibe(p.vibe);
+                  setNumShows(p.numShows);
+                  generate(p.theme, p.vibe, p.numShows);
+                }}
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {signaturePresets.map((p) => (
-            <button
-              key={p.id}
-              className="btn py-1.5 px-3 text-[12px] disabled:opacity-50"
-              disabled={!canWrite}
-              onClick={() => {
-                setTheme(p.theme);
-                setVibe(p.vibe);
-                setNumShows(p.numShows);
-                generate(p.theme, p.vibe, p.numShows);
-              }}
-            >
-              {p.name}
-            </button>
-          ))}
-        </div>
-      </div>
+      )}
     </section>
   );
 }

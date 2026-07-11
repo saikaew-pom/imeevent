@@ -68,13 +68,14 @@ function pick(
 export function buildSuggestion(
   theme: ThemeKey | "mixed",
   vibe: VibeLevel,
-  numShows: number
+  numShows: number,
+  pool: Act[] = acts
 ): Suggestion {
   const used = new Set<string>();
   const slots: SuggestedSlot[] = [];
-  const themed = acts.filter((a) => inTheme(a, theme));
-  // Fallback pool: if a themed slot can't be filled, borrow from all acts.
-  const all = acts;
+  const themed = pool.filter((a) => inTheme(a, theme));
+  // Fallback pool: if a themed slot can't be filled, borrow from the whole pool.
+  const all = pool;
 
   const peak = vibePeak[vibe];
 
@@ -137,7 +138,7 @@ export function buildSuggestion(
   const themeName = theme === "mixed" ? "mixed international" : theme;
   const lastSlot = slots[slots.length - 1];
   const finaleLabel = lastSlot
-    ? acts.find((a) => a.id === lastSlot.actId)?.energyLabel?.toLowerCase()
+    ? pool.find((a) => a.id === lastSlot.actId)?.energyLabel?.toLowerCase()
     : undefined;
   const summary = `${showCount}-show ${VIBE_LABELS[vibe].toLowerCase()} arc on a ${themeName} theme — a rising curve from a soft welcome to a ${
     finaleLabel ?? "high"

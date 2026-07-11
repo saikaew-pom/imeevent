@@ -44,7 +44,8 @@ export function ActLibrary() {
   const [viewing, setViewing] = useState<Act | null>(null);
   const [error, setError] = useState("");
 
-  const all = useMemo(() => allActsList(customActs), [customActs]);
+  const isJW = PROJECT_SLUG === "jw-gala-garden-night";
+  const all = useMemo(() => allActsList(customActs, isJW), [customActs, isJW]);
 
   const filtered = useMemo(() => {
     return all.filter((a) => {

@@ -56,37 +56,3 @@ export interface CostLine {
   day?: number; // 1-based event day/function this line belongs to — enables per-day spend breakdown
 }
 
-// 2026 default cost lines — seeded off the 2025 actuals and adjusted for the JW
-// ballroom + pond format (~230 pax, single VIP package). Fully editable.
-// NOTE: live show-act cost from the Entertainment Builder is added on top of
-// these as a separate synced line (see pnl.ts), so it is NOT duplicated here.
-export const default2026CostLines: CostLine[] = [
-  // Tent
-  { id: "tent-main", group: "tent", label: "Main tent (pond / outdoor countdown)", value: 200000 },
-  { id: "tent-food", group: "tent", label: "Food tents", value: 0 },
-  // Production, AV, Decoration & Show
-  { id: "prod-av", group: "production", label: "Sound, lighting, LED, staging & AV", value: 550000, ent: true },
-  { id: "prod-band", group: "production", label: "Band, DJ & MC", value: 350000, ent: true },
-  { id: "prod-centerpiece", group: "production", label: "Centerpiece & florals", value: 45000 },
-  { id: "prod-props", group: "production", label: "Props on table", value: 13000 },
-  { id: "prod-partypack", group: "production", label: "Party pack", value: 0 },
-  { id: "prod-kids", group: "production", label: "Kids corner (game & décor)", value: 5000 },
-  { id: "prod-neon", group: "production", label: "Neon décor (body paint / mask)", value: 0 },
-  { id: "prod-bandtravel", group: "production", label: "Band travel (air / transport / room)", value: 90000 },
-  // Misc
-  { id: "misc-wristband", group: "misc", label: "Wristband", value: 8000 },
-  { id: "misc-ice", group: "misc", label: "Ice for kitchen décor", value: 0 },
-  { id: "misc-mics", group: "misc", label: "MICS (menu papers / candles)", value: 5000 },
-  { id: "misc-ticket", group: "misc", label: "Ticket NYE + box + marker", value: 400 },
-  { id: "misc-staffuni", group: "misc", label: "Staff uniform", value: 30000 },
-  { id: "misc-hostessuni", group: "misc", label: "Hostess uniform", value: 2000 },
-  { id: "misc-luckydraw", group: "misc", label: "Lucky draw", value: 0 },
-  { id: "misc-tablerunner", group: "misc", label: "Table runner", value: 5000 },
-  // Others
-  { id: "others-payroll", group: "others", label: "Department payroll (per day +37%)", value: 0 },
-  { id: "others-casuals", group: "others", label: "Casuals", value: 5000 },
-  { id: "others-truck", group: "others", label: "Truck / logistics", value: 12000 },
-  // Food & Beverage COGS
-  { id: "fnb-food", group: "fnb", label: "Food cost", value: 350000, note: "≈ ฿1,520 / guest" },
-  { id: "fnb-bev", group: "fnb", label: "Beverage cost", value: 366000, note: "≈ ฿1,590 / guest" },
-];

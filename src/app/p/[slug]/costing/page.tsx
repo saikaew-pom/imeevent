@@ -15,7 +15,12 @@ import Link from "next/link";
 import { useProjectSlug } from "@/components/ProjectProvider";
 
 export default function CostingPage() {
-  const base = `/p/${useProjectSlug()}`;
+  const slug = useProjectSlug();
+  const base = `/p/${slug}`;
+  // The 2023–2025 historical benchmark is JW's own production actuals — it
+  // only means anything on JW's project. Every other project simply plans
+  // without a historical comparison until it has its own history.
+  const isJW = slug === "jw-gala-garden-night";
   const contentRef = useRef<HTMLDivElement>(null);
   const financials = useDeck((s) => s.financials);
   const setTier = useDeck((s) => s.setTier);
@@ -61,8 +66,8 @@ export default function CostingPage() {
           </h1>
           <p className="text-[13px] text-[var(--text-dim)] mt-1 max-w-2xl">
             The full cost structure on the five like-for-like line items. Edit any
-            sub-item and watch GOP move in real time — every line is benchmarked
-            against the 2025 actual.
+            sub-item and watch GOP move in real time
+            {isJW ? " — every line is benchmarked against the 2025 actual." : "."}
           </p>
         </div>
         <div className="flex gap-2 items-center" data-export-hide>
@@ -91,7 +96,7 @@ export default function CostingPage() {
           )}
           <ExportSaveButtons
             targetRef={contentRef}
-            filename="jw-gala-costing.pdf"
+            filename={`${slug}-costing.pdf`}
             canWrite={canWrite}
           />
         </div>
@@ -182,17 +187,19 @@ export default function CostingPage() {
                         }
                       />
                     </div>
-                    <div className="text-[11px] text-[var(--text-faint)] mt-1">
-                      2025 actual {thbShort(actual2025)} ·{" "}
-                      <span
-                        style={{
-                          color: delta > 0 ? "var(--danger)" : "var(--emerald-bright)",
-                        }}
-                      >
-                        {delta >= 0 ? "+" : ""}
-                        {thbShort(delta)} vs plan
-                      </span>
-                    </div>
+                    {isJW && (
+                      <div className="text-[11px] text-[var(--text-faint)] mt-1">
+                        2025 actual {thbShort(actual2025)} ·{" "}
+                        <span
+                          style={{
+                            color: delta > 0 ? "var(--danger)" : "var(--emerald-bright)",
+                          }}
+                        >
+                          {delta >= 0 ? "+" : ""}
+                          {thbShort(delta)} vs plan
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     <div className="text-lg font-semibold gold-text">
@@ -296,28 +303,30 @@ export default function CostingPage() {
             </section>
           )}
 
-          <section className="panel px-5 py-5">
-            <h3 className="text-sm font-semibold emerald-text mb-3">
-              Plan vs 2025 actual
-            </h3>
-            <CompareRow label="Revenue" plan={pnl.totalRevenue} actual={histSummary.revenue[2]} higherIsGood />
-            <CompareRow label="Operating cost" plan={pnl.operatingCost} actual={histSummary.operatingCost[2]} />
-            <CompareRow label="F&B cost" plan={pnl.fnbCost} actual={histSummary.fnbCost[2]} />
-            <CompareRow label="Total cost" plan={pnl.totalCost} actual={histSummary.totalCost[2]} />
-            <CompareRow label="GOP" plan={pnl.grossProfit} actual={histSummary.gop[2]} higherIsGood />
-            <div className="flex justify-between items-center pt-2 mt-1 border-t hairline">
-              <span className="text-[12px] text-[var(--text-dim)]">GOP margin</span>
-              <span className="text-[13px]">
-                <span className="font-semibold" style={{ color: marginColor(pnl.marginPct) }}>
-                  {pct(pnl.marginPct)}
+          {isJW && (
+            <section className="panel px-5 py-5">
+              <h3 className="text-sm font-semibold emerald-text mb-3">
+                Plan vs 2025 actual
+              </h3>
+              <CompareRow label="Revenue" plan={pnl.totalRevenue} actual={histSummary.revenue[2]} higherIsGood />
+              <CompareRow label="Operating cost" plan={pnl.operatingCost} actual={histSummary.operatingCost[2]} />
+              <CompareRow label="F&B cost" plan={pnl.fnbCost} actual={histSummary.fnbCost[2]} />
+              <CompareRow label="Total cost" plan={pnl.totalCost} actual={histSummary.totalCost[2]} />
+              <CompareRow label="GOP" plan={pnl.grossProfit} actual={histSummary.gop[2]} higherIsGood />
+              <div className="flex justify-between items-center pt-2 mt-1 border-t hairline">
+                <span className="text-[12px] text-[var(--text-dim)]">GOP margin</span>
+                <span className="text-[13px]">
+                  <span className="font-semibold" style={{ color: marginColor(pnl.marginPct) }}>
+                    {pct(pnl.marginPct)}
+                  </span>
+                  <span className="text-[var(--text-faint)]">
+                    {" "}
+                    vs {pct(histSummary.margin[2])}
+                  </span>
                 </span>
-                <span className="text-[var(--text-faint)]">
-                  {" "}
-                  vs {pct(histSummary.margin[2])}
-                </span>
-              </span>
-            </div>
-          </section>
+              </div>
+            </section>
+          )}
 
           <section className="grid grid-cols-2 gap-2">
             <MiniStat

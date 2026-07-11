@@ -443,12 +443,13 @@ export const useDeck = create<DeckState>()(
 
         resetFinancials: () => {
           if (!isWritable(get().myRole)) return;
-          set({
+          set((s) => ({
             financials: {
+              currency: s.financials.currency,
               tiers: defaultFinancials.tiers.map((t) => ({ ...t })),
               costLines: defaultFinancials.costLines.map((l) => ({ ...l })),
             },
-          });
+          }));
           persistFinancials();
         },
 
