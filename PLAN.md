@@ -97,7 +97,17 @@ JW's project (`jw-gala-garden-night`, guest passcode `cheewitcheewa`) must stay 
 
 ## Phase H — AI theming
 
-- [ ] Not started
+Scoped (per user decision) as an additive AI theme concept + palette, not a
+full re-skin of the app's own fixed emerald/gold UI (~25+ components hardcode
+that look with no per-project theme mechanism — swapping it would need a
+structural refactor first, out of scope here).
+
+- [x] H1: data model (`src/data/theme.ts`) + server `generateEventTheme()` (hard 45s timeout, JSON validation) + `"aiTheme"` added to `STATE_KEYS` (no migration — `project_state.key` has no CHECK constraint)
+- [x] H2: API route — `POST /api/builder/theme/generate`
+- [x] H3: store wiring — `aiTheme` hydrate + `generateAITheme` action
+- [x] H4: UI — theme section in Event Settings (generate/regenerate + swatches) + conditional dashboard hero display (JW-safe: renders nothing without a saved theme)
+- [ ] H5: this file updated
+- [ ] H6: verify locally + commit + deploy + verify in production
 
 ## Phase I — Company Library core (Media + Show & Decor)
 

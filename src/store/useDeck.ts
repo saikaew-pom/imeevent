@@ -20,6 +20,7 @@ import { ProjectTask, NewTaskInput, ProjectMember } from "@/data/tasks";
 import { ProjectDocument, NewDocumentInput, SuggestedTask } from "@/data/documents";
 import { MediaAsset } from "@/data/media";
 import { Talent, NewTalentInput } from "@/data/talent";
+import { EventTheme } from "@/data/theme";
 
 export interface LineupItem {
   uid: string;
@@ -82,6 +83,8 @@ interface DeckState {
   sharedStateLoaded: boolean;
   program: Beat[];
   meta: EventMeta; // per-project event branding (venue, date, concept, …)
+  aiTheme: EventTheme | null; // AI-generated theme concept + color palette, if any
+  aiThemeGenerating: boolean;
   presentation: Slide[];
   slideGenerating: string | null; // beatId currently being generated, if any
   slideBatchProgress: { current: number; total: number } | null;
@@ -138,6 +141,7 @@ interface DeckState {
   // mutating action below can push its own debounced update.
   hydrateSharedState: (slug: string) => Promise<void>;
   updateEventMeta: (patch: Partial<EventMeta>) => void;
+  generateAITheme: (slug: string) => Promise<{ ok: boolean; error?: string }>;
 
   addProgramBeat: (day?: number) => string;
   updateProgramBeat: (id: string, patch: Partial<Beat>) => void;
@@ -283,6 +287,8 @@ export const useDeck = create<DeckState>()(
         sharedStateLoaded: false,
         program: runOfShow.map((b) => ({ ...b })),
         meta: { ...EMPTY_EVENT_META },
+        aiTheme: null,
+        aiThemeGenerating: false,
         presentation: [],
         slideGenerating: null,
         slideBatchProgress: null,
@@ -557,6 +563,7 @@ export const useDeck = create<DeckState>()(
               presentation: Slide[] | null;
               hiddenSlides: string[] | null;
               meta: EventMeta | null;
+              aiTheme: EventTheme | null;
             }>(`/api/builder/state?slug=${encodeURIComponent(slug)}`);
             set({
               projectSlug: slug,
@@ -568,6 +575,7 @@ export const useDeck = create<DeckState>()(
               presentation: data.presentation ?? [],
               hiddenSlides: data.hiddenSlides ?? [],
               meta: { ...EMPTY_EVENT_META, ...(data.meta ?? {}) },
+              aiTheme: data.aiTheme ?? null,
             });
           } catch {
             set({
@@ -579,6 +587,7 @@ export const useDeck = create<DeckState>()(
               presentation: [],
               hiddenSlides: [],
               meta: { ...EMPTY_EVENT_META },
+              aiTheme: null,
             });
           }
         },
@@ -587,6 +596,24 @@ export const useDeck = create<DeckState>()(
           if (!isWritable(get().myRole)) return;
           set((s) => ({ meta: { ...s.meta, ...patch } }));
           persistMeta();
+        },
+
+        generateAITheme: async (slug) => {
+          if (!isWritable(get().myRole)) return { ok: false, error: "Read-only access." };
+          set({ aiThemeGenerating: true });
+          try {
+            const data = await apiJson<{ theme: EventTheme }>("/api/builder/theme/generate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug }),
+            });
+            set({ aiTheme: data.theme });
+            return { ok: true };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Theme generation failed." };
+          } finally {
+            set({ aiThemeGenerating: false });
+          }
         },
 
         addProgramBeat: (day) => {

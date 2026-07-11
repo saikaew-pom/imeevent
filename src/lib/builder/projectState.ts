@@ -8,6 +8,7 @@ export const STATE_KEYS = [
   "presentation",
   "hiddenSlides",
   "meta",
+  "aiTheme",
 ] as const;
 export type StateKey = (typeof STATE_KEYS)[number];
 
@@ -34,6 +35,7 @@ export async function getProjectState(
     presentation: null,
     hiddenSlides: null,
     meta: null,
+    aiTheme: null,
   };
   for (const row of results) {
     if (STATE_KEYS.includes(row.key)) {

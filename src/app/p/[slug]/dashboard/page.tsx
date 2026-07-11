@@ -42,6 +42,7 @@ const modules = [
 export default function Home() {
   const { slug, name, role } = useProject();
   const meta = useDeck((s) => s.meta);
+  const aiTheme = useDeck((s) => s.aiTheme);
   const canWrite = role === "owner" || role === "editor";
   const [editing, setEditing] = useState(false);
   const base = `/p/${slug}`;
@@ -122,6 +123,36 @@ export default function Home() {
               </span>
             )}
           </p>
+        </section>
+      )}
+
+      {/* AI theme concept — only present once generated from Event Settings, so
+          a project with none (e.g. JW) renders exactly as before. */}
+      {aiTheme && (
+        <section className="panel px-7 py-6 mt-3">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="gold-text text-sm font-semibold">✨ {aiTheme.name}</span>
+          </div>
+          <p className="text-[14px] text-[var(--text-dim)] leading-relaxed max-w-4xl mb-3">
+            {aiTheme.description}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {aiTheme.palette.map((c) => (
+              <div
+                key={c.hex}
+                className="flex items-center gap-1.5 rounded-full pl-1 pr-2.5 py-1"
+                style={{ background: "var(--bg-soft)", border: "1px solid var(--border)" }}
+              >
+                <span
+                  className="w-4 h-4 rounded-full shrink-0"
+                  style={{ background: c.hex, border: "1px solid rgba(0,0,0,0.15)" }}
+                />
+                <span className="text-[11px] text-[var(--text-dim)]">
+                  {c.label} · {c.hex}
+                </span>
+              </div>
+            ))}
+          </div>
         </section>
       )}
 
