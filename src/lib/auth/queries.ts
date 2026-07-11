@@ -542,6 +542,17 @@ export async function isCompanyAdmin(userId: string, companyId: string): Promise
   return row?.role === "admin";
 }
 
+// Any membership at all (admin or member) — gates read/browse access to the
+// company's library, as opposed to isCompanyAdmin which gates curating it.
+export async function isCompanyMember(userId: string, companyId: string): Promise<boolean> {
+  const db = await getDB();
+  const row = await db
+    .prepare("SELECT 1 as found FROM company_members WHERE user_id = ? AND company_id = ?")
+    .bind(userId, companyId)
+    .first<{ found: number }>();
+  return Boolean(row);
+}
+
 // The company a user creates new self-serve projects under. Admin-invite-only
 // signup always assigns exactly one company at user-creation time, so "first"
 // is unambiguous today; this is the one seam if that ever changes.

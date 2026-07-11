@@ -111,10 +111,49 @@ structural refactor first, out of scope here).
 
 **Shipped:** commit `634f39f`, no migration needed, deployed (Version ID `0116e337-93d1-46cd-abe1-56ec14562bec`). JW's live guest-passcode dashboard confirmed unaffected post-deploy.
 
-## Phase I — Company Library core (Media + Show & Decor)
+## Phase I/J — Company Library (Media + Show & Decor, then Equipment Rental / Sound & Lighting / Airport Transfers / Tours & Activities)
 
-- [ ] Not started
+Built as one combined pass since J is explicitly "the same library mechanism,
+more categories." Architecture decisions (no existing precedent diverges, so
+made without asking, stated here for the record):
 
-## Phase J — Company Library extended (Equipment Rental, Sound & Lighting, Airport Transfers, Tours & Activities)
+- **Copy-on-use, not live-shared records.** Picking a library item into a
+  project copies it into that project's own storage (new id, independently
+  editable from then on) — matches every other reuse mechanism already built
+  (act overrides, Phase G duplication). A live-synced shared record would be
+  a different, riskier architecture with no precedent in this codebase.
+- **Three new company-scoped tables**, mirroring existing project-scoped
+  shapes so copying is a straight field-for-field insert:
+  `company_library_media` (mirrors `media_assets`), `company_library_acts`
+  (mirrors `custom_acts`, kind show/decor), `company_library_vendors` (new —
+  one table with a `category` column for all four Phase J categories, since
+  they're structurally identical: name/description/photo/cost/unit/vendor
+  contact — four separate tables would just repeat the same schema).
+- **Vendor items copy into a project as a `CostLine`** in Costing (not a new
+  project-level table) — they're literally rentable/bookable line items with
+  a cost, and Costing already has the exact shape. Category → cost group is
+  fixed automatically: `equipment`/`sound-lighting` → `production`,
+  `airport-transfers`/`tours-activities` → `others` (both already described
+  as covering exactly this in `costStructure.ts`) — no new cost group needed.
+- **Browsing is open to any company member; curating (add/edit/delete) is
+  company-admin/super-admin only** — mirrors how the rest of the company
+  tenancy layer already splits "member" vs "admin".
+- **New self-serve `/library` page**, not folded into `/admin` — admin is
+  oriented around user/project management and is already large; a page
+  alongside `/projects` fits the "browse and copy into my project" workflow
+  better. Scoped to the caller's own company via `getPrimaryCompanyId`,
+  resolved server-side (never trusts a client-supplied `companyId`).
+- **Not in scope for this pass:** picking a library item from *inside* the
+  existing Media Library / Show & Decor Builder pages (i.e. a second entry
+  point). The `/library` page's own "Copy to project" picker delivers the
+  full value; wiring a reverse-direction browse-from-builder picker is a
+  future enhancement, not required for the library to work end-to-end.
 
-- [ ] Not started
+- [x] L1: migration `0013_company_library.sql` — three tables above
+- [x] L2: query layer — list/create/update/delete for media/acts/vendors + `isCompanyMember` + copy-to-project functions (media→`media_assets`, acts→`custom_acts`, vendor→`financials.costLines`)
+- [x] L3: API routes — CRUD for all three item types + copy-to-project endpoints
+- [x] L4: UI — `/library` page (tabs: Media / Show & Decor / Vendors; admin-only add/edit/delete forms; copy-to-project picker for every member)
+- [x] L5: nav link to `/library`
+- [x] L6: this file updated
+- [x] L7: verified locally — added one media/act/vendor item, copied each into a test project (correct table/CostLine, correct cost-group mapping), confirmed independence (editing the library item didn't touch the project's copy), confirmed a non-admin member can browse/copy but gets 403 on add, confirmed JW untouched. All test data cleaned up by exact id.
+- [ ] L8: commit + apply migration to production D1 + deploy + verify in production

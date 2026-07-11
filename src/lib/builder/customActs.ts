@@ -184,14 +184,14 @@ export async function customActExists(projectId: string, id: string): Promise<bo
   return Boolean(row);
 }
 
-function energyLabelFor(n: number): string {
+export function energyLabelFor(n: number): string {
   if (n <= 3) return "Low";
   if (n <= 5) return "Medium";
   if (n <= 8) return "High";
   return "Very High";
 }
 
-function placeholderPhoto(): string {
+export function placeholderPhoto(): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="100%" height="100%" fill="#182620"/><text x="50%" y="50%" fill="#5b7268" font-family="sans-serif" font-size="18" text-anchor="middle" dominant-baseline="middle">No photo</text></svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }

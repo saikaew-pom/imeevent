@@ -27,6 +27,9 @@ export default async function ProjectsPage() {
             <span className="text-[14px] font-semibold">EventFlow Production</span>
           </div>
           <div className="flex items-center gap-4">
+            <Link href="/library" className="text-[13px] hover:underline" style={{ color: sub }}>
+              Library
+            </Link>
             {user.isAdmin && (
               <Link href="/admin" className="text-[13px] hover:underline" style={{ color: sub }}>
                 Admin
