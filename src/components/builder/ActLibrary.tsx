@@ -14,7 +14,7 @@ import {
 } from "@/data/acts";
 import { useDeck } from "@/store/useDeck";
 import { EnergyDots } from "@/components/EnergyBadge";
-import { thbShort } from "@/lib/format";
+import { moneyShort } from "@/lib/format";
 import { ItemFormModal } from "./ItemFormModal";
 import { useProjectSlug } from "@/components/ProjectProvider";
 
@@ -219,6 +219,7 @@ function ActCard({
   removeLabel?: string;
 }) {
   const isShow = act.kind === "show";
+  const currency = useDeck((s) => s.financials.currency ?? "THB");
   return (
     <div className="panel-2 overflow-hidden group flex flex-col">
       <div
@@ -286,7 +287,7 @@ function ActCard({
         </div>
         <div className="flex items-center justify-between">
           <span className="text-[10px] text-[var(--text-faint)]">
-            {thbShort(act.costTHB)} · {act.durationMin}m
+            {moneyShort(act.costTHB, currency)} · {act.durationMin}m
           </span>
           {(onEdit || onRemove) && (
             <div className="flex gap-1">

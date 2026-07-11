@@ -103,8 +103,52 @@ export default function FlowPage() {
     highlight: Boolean(b.peak),
   }));
 
+  // Multi-day support. Day 1 is implicit (beats without a `day`), so a
+  // single-day event like JW renders through the untouched single-day path
+  // below. A project becomes multi-day the moment any beat carries day >= 2.
+  const maxDay = program.reduce((m, b) => Math.max(m, b.day ?? 1), 1);
+  const isMultiDay = program.some((b) => (b.day ?? 1) > 1);
+  const dayNums = Array.from(
+    new Set(program.map((b) => b.day ?? 1))
+  ).sort((a, b) => a - b);
+
+  const dayBeatIds = (day: number) =>
+    program.filter((b) => (b.day ?? 1) === day).map((b) => b.id);
+
+  // Reorder within one day while leaving every other day's beats in place.
+  const applyDayReorder = (day: number, newDayIds: string[]) => {
+    const queue = [...newDayIds];
+    const full = program.map((b) =>
+      (b.day ?? 1) === day ? (queue.shift() as string) : b.id
+    );
+    reorderProgram(full);
+  };
+
+  const moveBeatWithinDay = (day: number, indexInDay: number, dir: -1 | 1) => {
+    const ids = dayBeatIds(day);
+    const target = indexInDay + dir;
+    if (target < 0 || target >= ids.length) return;
+    [ids[indexInDay], ids[target]] = [ids[target], ids[indexInDay]];
+    applyDayReorder(day, ids);
+  };
+
+  const handleDayDragEnd = (day: number, e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const ids = dayBeatIds(day);
+    const oldIndex = ids.indexOf(active.id as string);
+    const newIndex = ids.indexOf(over.id as string);
+    if (oldIndex === -1 || newIndex === -1) return;
+    applyDayReorder(day, arrayMove(ids, oldIndex, newIndex));
+  };
+
   const handleAddProgram = () => {
     const id = addProgramBeat();
+    setSelected(id);
+  };
+
+  const handleAddDay = () => {
+    const id = addProgramBeat(maxDay + 1);
     setSelected(id);
   };
 
@@ -154,74 +198,158 @@ export default function FlowPage() {
         </div>
       </div>
 
-      {/* Energy curve */}
-      <section className="panel px-4 py-5 md:px-7 md:py-6">
-        <div className="flex items-center justify-between mb-1 px-2">
-          <span className="text-[12px] uppercase tracking-wide text-[var(--text-faint)]">
-            Energy across the night
-          </span>
-          <div className="flex gap-3 text-[11px] text-[var(--text-faint)]">
-            <span className="flex items-center gap-1.5">
-              <span
-                className="w-2 h-2 rounded-full"
-                style={{ background: "var(--gold-bright)" }}
-              />
-              Peak
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span
-                className="w-2 h-2 rounded-full"
-                style={{ background: "var(--emerald-bright)" }}
-              />
-              Baseline beat
-            </span>
-          </div>
-        </div>
-        <EnergyCurve points={points} height={250} compact />
-        <p className="text-[11px] text-[var(--text-faint)] px-2 mt-1">
-          Energy for any beat with linked shows is calculated live from those
-          shows — pick or change acts below and the curve updates instantly.
-        </p>
-      </section>
-
-      {/* Timeline */}
-      <DndContext
-        sensors={dragSensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext
-          items={program.map((b) => b.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          <section className="grid gap-2.5 mt-4">
-            {program.map((b, i) => (
-              <BeatRow
-                key={b.id}
-                beat={b}
-                view={view}
-                canWrite={canWrite}
-                customActs={customActs}
-                expanded={expanded.has(b.id)}
-                onToggle={() => toggle(b.id)}
-                onDetails={() => setSelected(b.id)}
-                isFirst={i === 0}
-                isLast={i === program.length - 1}
-                onMoveUp={() => moveBeat(i, -1)}
-                onMoveDown={() => moveBeat(i, 1)}
-                onDelete={() => removeProgramBeat(b.id)}
-              />
-            ))}
+      {!isMultiDay ? (
+        <>
+          {/* Energy curve */}
+          <section className="panel px-4 py-5 md:px-7 md:py-6">
+            <div className="flex items-center justify-between mb-1 px-2">
+              <span className="text-[12px] uppercase tracking-wide text-[var(--text-faint)]">
+                Energy across the night
+              </span>
+              <div className="flex gap-3 text-[11px] text-[var(--text-faint)]">
+                <span className="flex items-center gap-1.5">
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{ background: "var(--gold-bright)" }}
+                  />
+                  Peak
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{ background: "var(--emerald-bright)" }}
+                  />
+                  Baseline beat
+                </span>
+              </div>
+            </div>
+            <EnergyCurve points={points} height={250} compact />
+            <p className="text-[11px] text-[var(--text-faint)] px-2 mt-1">
+              Energy for any beat with linked shows is calculated live from those
+              shows — pick or change acts below and the curve updates instantly.
+            </p>
           </section>
-        </SortableContext>
-      </DndContext>
+
+          {/* Timeline */}
+          <DndContext
+            sensors={dragSensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={program.map((b) => b.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <section className="grid gap-2.5 mt-4">
+                {program.map((b, i) => (
+                  <BeatRow
+                    key={b.id}
+                    beat={b}
+                    view={view}
+                    canWrite={canWrite}
+                    customActs={customActs}
+                    expanded={expanded.has(b.id)}
+                    onToggle={() => toggle(b.id)}
+                    onDetails={() => setSelected(b.id)}
+                    isFirst={i === 0}
+                    isLast={i === program.length - 1}
+                    onMoveUp={() => moveBeat(i, -1)}
+                    onMoveDown={() => moveBeat(i, 1)}
+                    onDelete={() => removeProgramBeat(b.id)}
+                  />
+                ))}
+              </section>
+            </SortableContext>
+          </DndContext>
+
+          {view === "planner" && canWrite && (
+            <button
+              onClick={handleAddProgram}
+              className="btn btn-emerald w-full mt-2.5 py-3"
+            >
+              + Add program
+            </button>
+          )}
+        </>
+      ) : (
+        dayNums.map((day) => {
+          const dayBeats = program.filter((b) => (b.day ?? 1) === day);
+          const dayPoints: CurvePoint[] = dayBeats.map((b) => ({
+            label: b.time,
+            sublabel: b.segment,
+            energy: liveBeatEnergy(b, customActs),
+            highlight: Boolean(b.peak),
+          }));
+          return (
+            <div key={day} className="mt-7 first:mt-4">
+              <div className="flex items-center justify-between mb-2 px-1">
+                <h2 className="font-display italic text-2xl gold-gradient">
+                  Day {day}
+                </h2>
+                <span className="text-[11px] text-[var(--text-faint)]">
+                  {dayBeats.length} block{dayBeats.length === 1 ? "" : "s"}
+                </span>
+              </div>
+
+              {/* Per-day energy curve */}
+              <section className="panel px-4 py-4 md:px-6 md:py-5">
+                <EnergyCurve points={dayPoints} height={190} compact />
+              </section>
+
+              {/* Per-day timeline — drag/reorder stays within the day */}
+              <DndContext
+                sensors={dragSensors}
+                collisionDetection={closestCenter}
+                onDragEnd={(e) => handleDayDragEnd(day, e)}
+              >
+                <SortableContext
+                  items={dayBeats.map((b) => b.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <section className="grid gap-2.5 mt-3">
+                    {dayBeats.map((b, i) => (
+                      <BeatRow
+                        key={b.id}
+                        beat={b}
+                        view={view}
+                        canWrite={canWrite}
+                        customActs={customActs}
+                        expanded={expanded.has(b.id)}
+                        onToggle={() => toggle(b.id)}
+                        onDetails={() => setSelected(b.id)}
+                        isFirst={i === 0}
+                        isLast={i === dayBeats.length - 1}
+                        onMoveUp={() => moveBeatWithinDay(day, i, -1)}
+                        onMoveDown={() => moveBeatWithinDay(day, i, 1)}
+                        onDelete={() => removeProgramBeat(b.id)}
+                      />
+                    ))}
+                  </section>
+                </SortableContext>
+              </DndContext>
+
+              {view === "planner" && canWrite && (
+                <button
+                  onClick={() => {
+                    const id = addProgramBeat(day);
+                    setSelected(id);
+                  }}
+                  className="btn btn-emerald w-full mt-2.5 py-2.5 text-[13px]"
+                >
+                  + Add block to Day {day}
+                </button>
+              )}
+            </div>
+          );
+        })
+      )}
 
       {view === "planner" && canWrite && (
         <button
-          onClick={handleAddProgram}
-          className="btn btn-emerald w-full mt-2.5 py-3"
+          onClick={handleAddDay}
+          className="btn w-full mt-4 py-2.5 text-[13px]"
         >
-          + Add program
+          + Add Day {maxDay + 1}
         </button>
       )}
 
@@ -376,6 +504,16 @@ function BeatRow({
             {beat.custom && (
               <span className="chip" style={{ color: "var(--emerald-bright)" }}>
                 custom
+              </span>
+            )}
+            {beat.audience && beat.audience !== "all" && (
+              <span className="chip" style={{ color: "var(--text-dim)" }}>
+                {beat.audience === "optional" ? "optional" : "core group"}
+              </span>
+            )}
+            {beat.attire && (
+              <span className="chip" style={{ color: "var(--text-dim)" }}>
+                👔 {beat.attire}
               </span>
             )}
           </div>
@@ -590,6 +728,11 @@ function BeatDrawer({
   const draftBeatText = useDeck((s) => s.draftBeatText);
   const myRole = useDeck((s) => s.myRole);
   const canWrite = myRole === "owner" || myRole === "editor";
+  // Highest day in the program — drives whether the drawer shows a Day picker
+  // (only once the event is multi-day, so single-day projects stay unchanged).
+  const maxDay = useDeck((s) =>
+    s.program.reduce((m, b) => Math.max(m, b.day ?? 1), 1)
+  );
   const PROJECT_SLUG = useProjectSlug();
 
   const [addingActId, setAddingActId] = useState("");
@@ -727,6 +870,24 @@ function BeatDrawer({
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">
               Edit details
             </div>
+            {maxDay > 1 && (
+              <Field label="Day">
+                <select
+                  value={beat.day ?? 1}
+                  onChange={(e) => {
+                    const d = Number(e.target.value) || 1;
+                    updateProgramBeat(beat.id, { day: d === 1 ? undefined : d });
+                  }}
+                  className="w-full"
+                >
+                  {Array.from({ length: maxDay }, (_, i) => i + 1).map((d) => (
+                    <option key={d} value={d}>
+                      Day {d}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <Field label="Duration (min)">
                 <input
@@ -772,6 +933,33 @@ function BeatDrawer({
                 className="w-full"
               />
             </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Audience">
+                <select
+                  value={beat.audience ?? ""}
+                  onChange={(e) =>
+                    updateProgramBeat(beat.id, {
+                      audience: (e.target.value || undefined) as Beat["audience"],
+                    })
+                  }
+                  className="w-full"
+                >
+                  <option value="">Not set</option>
+                  <option value="all">All</option>
+                  <option value="core">Core group</option>
+                  <option value="optional">Optional</option>
+                </select>
+              </Field>
+              <Field label="Attire">
+                <input
+                  type="text"
+                  value={beat.attire ?? ""}
+                  placeholder="e.g. Black tie"
+                  onChange={(e) => updateProgramBeat(beat.id, { attire: e.target.value || undefined })}
+                  className="w-full"
+                />
+              </Field>
+            </div>
             <label className="block">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">

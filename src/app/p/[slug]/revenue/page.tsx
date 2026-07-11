@@ -9,7 +9,8 @@ import { Waterfall } from "@/components/Waterfall";
 import { HistorySection } from "@/components/revenue/HistorySection";
 import { HoverCard } from "@/components/HoverCard";
 import { ExportSaveButtons } from "@/components/ExportSaveButtons";
-import { thb, thbShort, pct } from "@/lib/format";
+import { money, moneyShort, pct } from "@/lib/format";
+import { guestLabelFor } from "@/data/projectTemplates";
 import Link from "next/link";
 import { useProjectSlug } from "@/components/ProjectProvider";
 
@@ -26,9 +27,14 @@ export default function RevenuePage() {
   const myRole = useDeck((s) => s.myRole);
   const canWrite = myRole === "owner" || myRole === "editor";
   const primary = financials.tiers[0];
+  const meta = useDeck((s) => s.meta);
+  const guestLabel = guestLabelFor(meta.eventType);
+  const guestSingular = guestLabel.replace(/s$/i, "").toLowerCase();
 
   const showActs = lineupTotals(lineup, customActs).totalCost;
   const pnl = computePnL(financials, showActs);
+  const m = (n: number) => money(n, pnl.currency);
+  const mShort = (n: number) => moneyShort(n, pnl.currency);
 
   const [scenarios, setScenarios] = useState<{ name: string; pnl: PnL }[]>([]);
   const snapshot = () => {
@@ -69,11 +75,11 @@ export default function RevenuePage() {
 
       {/* KPI row */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <Kpi label="Total revenue" value={thb(pnl.totalRevenue)} tone="emerald" />
-        <Kpi label="Total cost" value={thb(pnl.totalCost)} tone="danger" />
+        <Kpi label="Total revenue" value={m(pnl.totalRevenue)} tone="emerald" />
+        <Kpi label="Total cost" value={m(pnl.totalCost)} tone="danger" />
         <Kpi
           label="Gross profit"
-          value={thb(pnl.grossProfit)}
+          value={m(pnl.grossProfit)}
           tone={pnl.grossProfit >= 0 ? "gold" : "danger"}
         />
         <Kpi label="GOP margin" value={pct(pnl.marginPct)} tone="gold" />
@@ -87,7 +93,7 @@ export default function RevenuePage() {
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold emerald-text">Package tiers</h3>
               <span className="text-[11px] text-[var(--text-faint)]">
-                {pnl.pax} guests · {thb(pnl.totalRevenue)}
+                {pnl.pax} {guestLabel.toLowerCase()} · {m(pnl.totalRevenue)}
               </span>
             </div>
             <fieldset disabled={!canWrite} className="space-y-2 border-0 p-0 m-0">
@@ -172,20 +178,20 @@ export default function RevenuePage() {
                         </span>
                       }
                     />
-                    <span className="tabular-nums">{thbShort(val)}</span>
+                    <span className="tabular-nums">{mShort(val)}</span>
                   </div>
                 );
               })}
               <div className="flex items-center justify-between text-[12.5px] pt-1.5 border-t hairline font-semibold">
                 <span>Total cost</span>
                 <span className="tabular-nums" style={{ color: "var(--danger)" }}>
-                  {thb(pnl.totalCost)}
+                  {m(pnl.totalCost)}
                 </span>
               </div>
             </div>
             {showActs > 0 && (
               <p className="text-[11px] text-[var(--text-faint)] pt-2">
-                Includes {thb(showActs)} show acts from your{" "}
+                Includes {m(showActs)} show acts from your{" "}
                 <Link href={`${base}/builder`} className="emerald-text hover:underline">
                   lineup
                 </Link>
@@ -201,7 +207,7 @@ export default function RevenuePage() {
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold gold-text">P&amp;L waterfall</h3>
               <span className="text-[11px] text-[var(--text-faint)]">
-                {pnl.pax} guests · {thb(pnl.revenuePerGuest)}/guest revenue
+                {pnl.pax} {guestLabel.toLowerCase()} · {m(pnl.revenuePerGuest)}/{guestSingular} revenue
               </span>
             </div>
             <Waterfall pnl={pnl} />
@@ -215,7 +221,7 @@ export default function RevenuePage() {
             {primary && (
               <fieldset disabled={!canWrite} className="border-0 p-0 m-0">
                 <Slider
-                  label={`${primary.name} guests`}
+                  label={`${primary.name} ${guestLabel.toLowerCase()}`}
                   min={0}
                   max={350}
                   value={primary.qty}
@@ -229,12 +235,12 @@ export default function RevenuePage() {
                   step={500}
                   value={primary.priceTHB}
                   onChange={(v) => setTier(primary.id, { priceTHB: v })}
-                  display={thbShort(primary.priceTHB)}
+                  display={mShort(primary.priceTHB)}
                 />
               </fieldset>
             )}
             <div className="grid grid-cols-3 gap-2 mt-3">
-              <MiniStat label="Cost / guest" value={thb(pnl.costPerGuest)} />
+              <MiniStat label={`Cost / ${guestSingular}`} value={m(pnl.costPerGuest)} />
               <MiniStat
                 label={`Break-even ${pnl.primaryTierName.toLowerCase()}`}
                 value={Math.ceil(pnl.breakEvenQty).toString()}
@@ -287,10 +293,10 @@ export default function RevenuePage() {
                   <tbody>
                     {(
                       [
-                        ["Revenue", (x: PnL) => thb(x.totalRevenue)],
-                        ["Entertainment", (x: PnL) => thb(x.entertainment)],
-                        ["Total cost", (x: PnL) => thb(x.totalCost)],
-                        ["Gross profit", (x: PnL) => thb(x.grossProfit)],
+                        ["Revenue", (x: PnL) => m(x.totalRevenue)],
+                        ["Entertainment", (x: PnL) => m(x.entertainment)],
+                        ["Total cost", (x: PnL) => m(x.totalCost)],
+                        ["Gross profit", (x: PnL) => m(x.grossProfit)],
                         ["Margin", (x: PnL) => pct(x.marginPct)],
                       ] as [string, (x: PnL) => string][]
                     ).map(([label, fn], ri) => (

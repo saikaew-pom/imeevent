@@ -5,6 +5,7 @@ import { persist } from "zustand/middleware";
 import { Placement, ThemeKey, Act, NewActInput } from "@/data/acts";
 import { VibeLevel } from "@/data/presets";
 import { defaultFinancials, FinancialAssumptions, PackageTier } from "@/data/financials";
+import { CurrencyCode } from "@/lib/format";
 import { CostGroupKey } from "@/data/costStructure";
 import {
   runOfShow,
@@ -106,6 +107,7 @@ interface DeckState {
   setVibe: (v: VibeLevel) => void;
   setNumShows: (n: number) => void;
 
+  setCurrency: (currency: CurrencyCode) => void;
   setTier: (id: string, patch: Partial<PackageTier>) => void;
   addTier: () => void;
   removeTier: (id: string) => void;
@@ -137,7 +139,7 @@ interface DeckState {
   hydrateSharedState: (slug: string) => Promise<void>;
   updateEventMeta: (patch: Partial<EventMeta>) => void;
 
-  addProgramBeat: () => string;
+  addProgramBeat: (day?: number) => string;
   updateProgramBeat: (id: string, patch: Partial<Beat>) => void;
   removeProgramBeat: (id: string) => void;
   reorderProgram: (ids: string[]) => void;
@@ -349,6 +351,12 @@ export const useDeck = create<DeckState>()(
         setTheme: (t) => set({ theme: t }),
         setVibe: (v) => set({ vibe: v }),
         setNumShows: (n) => set({ numShows: Math.max(1, Math.min(5, n)) }),
+
+        setCurrency: (currency) => {
+          if (!isWritable(get().myRole)) return;
+          set((s) => ({ financials: { ...s.financials, currency } }));
+          persistFinancials();
+        },
 
         setTier: (id, patch) => {
           if (!isWritable(get().myRole)) return;
@@ -580,11 +588,14 @@ export const useDeck = create<DeckState>()(
           persistMeta();
         },
 
-        addProgramBeat: () => {
+        addProgramBeat: (day) => {
           if (!isWritable(get().myRole)) return "";
           const id = `custom-${uid()}`;
           const beat: Beat = {
             id,
+            // Day 1 stays implicit (no field) so single-day projects like JW
+            // keep byte-identical beats; day >= 2 is stored explicitly.
+            ...(day && day > 1 ? { day } : {}),
             time: "00:00",
             durationMin: 15,
             segment: "New Program",
@@ -595,7 +606,19 @@ export const useDeck = create<DeckState>()(
             linkedActs: [],
             custom: true,
           };
-          set((s) => ({ program: [...s.program, beat] }));
+          set((s) => {
+            // No day → append (single-day behavior, unchanged for JW).
+            if (day === undefined) return { program: [...s.program, beat] };
+            // Day-scoped add → keep the array grouped by ascending day by
+            // inserting right after the last beat whose day <= target.
+            const prog = [...s.program];
+            let insertAt = 0;
+            for (let i = 0; i < prog.length; i++) {
+              if ((prog[i].day ?? 1) <= day) insertAt = i + 1;
+            }
+            prog.splice(insertAt, 0, beat);
+            return { program: prog };
+          });
           persistProgram();
           return id;
         },

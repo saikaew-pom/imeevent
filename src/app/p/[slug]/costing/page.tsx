@@ -9,7 +9,8 @@ import { histGroupSubtotal, histSummary } from "@/data/history";
 import { Waterfall } from "@/components/Waterfall";
 import { HoverCard, InfoDot } from "@/components/HoverCard";
 import { ExportSaveButtons } from "@/components/ExportSaveButtons";
-import { thb, thbShort, pct } from "@/lib/format";
+import { money, moneyShort, thbShort, pct, CURRENCIES } from "@/lib/format";
+import { guestLabelFor } from "@/data/projectTemplates";
 import Link from "next/link";
 import { useProjectSlug } from "@/components/ProjectProvider";
 
@@ -23,16 +24,32 @@ export default function CostingPage() {
   const addCostLine = useDeck((s) => s.addCostLine);
   const removeCostLine = useDeck((s) => s.removeCostLine);
   const resetFinancials = useDeck((s) => s.resetFinancials);
+  const setCurrency = useDeck((s) => s.setCurrency);
   const lineup = useDeck((s) => s.lineup);
   const customActs = useDeck((s) => s.customActs);
   const myRole = useDeck((s) => s.myRole);
   const canWrite = myRole === "owner" || myRole === "editor";
+  const meta = useDeck((s) => s.meta);
+  const guestLabel = guestLabelFor(meta.eventType);
 
   const showActs = lineupTotals(lineup, customActs).totalCost;
   const pnl = computePnL(financials, showActs);
+  const m = (n: number) => money(n, pnl.currency);
+  const mShort = (n: number) => moneyShort(n, pnl.currency);
 
   const groupTotal = (k: CostGroupKey) =>
     pnl.groupTotals.find((g) => g.key === k)?.value ?? 0;
+
+  // Per-day/function spend breakdown — only shown when at least one cost
+  // line carries a day tag (e.g. Indian wedding functions); a flat single-day
+  // project's costLines never have this field, so nothing changes for JW.
+  const daySpend = new Map<number, number>();
+  for (const l of financials.costLines) {
+    if (l.day !== undefined) daySpend.set(l.day, (daySpend.get(l.day) ?? 0) + l.value);
+  }
+  const wholeEventSpend = financials.costLines
+    .filter((l) => l.day === undefined)
+    .reduce((s, l) => s + l.value, 0);
 
   return (
     <div ref={contentRef} className="mx-auto max-w-[1400px] px-5 py-8">
@@ -48,7 +65,22 @@ export default function CostingPage() {
             against the 2025 actual.
           </p>
         </div>
-        <div className="flex gap-2" data-export-hide>
+        <div className="flex gap-2 items-center" data-export-hide>
+          <label className="flex items-center gap-1.5 text-[12px] text-[var(--text-faint)]">
+            Currency
+            <select
+              value={pnl.currency}
+              disabled={!canWrite}
+              onChange={(e) => setCurrency(e.target.value as typeof pnl.currency)}
+              className="text-[12.5px]"
+            >
+              {CURRENCIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.code} · {c.symbol}
+                </option>
+              ))}
+            </select>
+          </label>
           <Link href={`${base}/revenue`} className="btn">
             ← Summary
           </Link>
@@ -67,15 +99,15 @@ export default function CostingPage() {
 
       {/* Live KPIs */}
       <section className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-        <Kpi label="Revenue" value={thb(pnl.totalRevenue)} tone="emerald" />
-        <Kpi label="Total cost" value={thb(pnl.totalCost)} tone="danger" />
+        <Kpi label="Revenue" value={m(pnl.totalRevenue)} tone="emerald" />
+        <Kpi label="Total cost" value={m(pnl.totalCost)} tone="danger" />
         <Kpi
           label="GOP"
-          value={thb(pnl.grossProfit)}
+          value={m(pnl.grossProfit)}
           tone={pnl.grossProfit >= 0 ? "gold" : "danger"}
         />
         <Kpi label="GOP margin" value={pct(pnl.marginPct)} tone="gold" />
-        <Kpi label="Cost / guest" value={thb(pnl.costPerGuest)} tone="emerald" />
+        <Kpi label={`Cost / ${guestLabel.replace(/s$/i, "").toLowerCase()}`} value={m(pnl.costPerGuest)} tone="emerald" />
       </section>
 
       <div className="grid lg:grid-cols-[1fr_400px] gap-4 items-start">
@@ -86,7 +118,7 @@ export default function CostingPage() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold emerald-text">Package revenue</h3>
               <span className="text-[11px] text-[var(--text-faint)]">
-                {pnl.pax} guests
+                {pnl.pax} {guestLabel.toLowerCase()}
               </span>
             </div>
             <div className="grid grid-cols-[1fr_100px_70px] gap-2 text-[10px] uppercase tracking-wide text-[var(--text-faint)] px-1 mb-1">
@@ -121,7 +153,7 @@ export default function CostingPage() {
             ))}
             <div className="flex justify-between text-[13px] pt-2 border-t hairline font-semibold">
               <span>Total revenue</span>
-              <span className="emerald-text">{thb(pnl.totalRevenue)}</span>
+              <span className="emerald-text">{m(pnl.totalRevenue)}</span>
             </div>
           </section>
 
@@ -164,7 +196,7 @@ export default function CostingPage() {
                   </div>
                   <div className="text-right">
                     <div className="text-lg font-semibold gold-text">
-                      {thbShort(plan)}
+                      {mShort(plan)}
                     </div>
                     <div className="text-[10px] text-[var(--text-faint)]">
                       {pct(pnl.totalCost ? (plan / pnl.totalCost) * 100 : 0)} of cost
@@ -183,7 +215,7 @@ export default function CostingPage() {
                       />
                     </span>
                     <span className="text-right text-[12.5px] text-[var(--text-faint)] tabular-nums pr-2">
-                      {showActs > 0 ? thb(showActs) : "—"}
+                      {showActs > 0 ? m(showActs) : "—"}
                     </span>
                     <Link
                       href={`${base}/builder`}
@@ -241,6 +273,28 @@ export default function CostingPage() {
             <h3 className="text-sm font-semibold gold-text mb-2">P&amp;L waterfall</h3>
             <Waterfall pnl={pnl} />
           </section>
+
+          {daySpend.size > 0 && (
+            <section className="panel px-5 py-5">
+              <h3 className="text-sm font-semibold emerald-text mb-3">Spend by day</h3>
+              <div className="space-y-1.5">
+                {Array.from(daySpend.entries())
+                  .sort((a, b) => a[0] - b[0])
+                  .map(([day, value]) => (
+                    <div key={day} className="flex justify-between items-center text-[12.5px]">
+                      <span className="text-[var(--text-dim)]">Day {day}</span>
+                      <span className="font-semibold">{m(value)}</span>
+                    </div>
+                  ))}
+                {wholeEventSpend > 0 && (
+                  <div className="flex justify-between items-center text-[12.5px] pt-1.5 mt-1 border-t hairline">
+                    <span className="text-[var(--text-faint)]">Whole-event (not day-specific)</span>
+                    <span className="font-semibold">{m(wholeEventSpend)}</span>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
 
           <section className="panel px-5 py-5">
             <h3 className="text-sm font-semibold emerald-text mb-3">

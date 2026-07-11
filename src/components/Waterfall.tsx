@@ -2,7 +2,7 @@
 
 import { PnL } from "@/lib/pnl";
 import { costGroupMeta } from "@/data/costStructure";
-import { thbShort } from "@/lib/format";
+import { moneyShort } from "@/lib/format";
 
 // A P&L waterfall: revenue bar, then each main cost line item steps down,
 // ending at gross profit.
@@ -79,7 +79,7 @@ export function Waterfall({ pnl }: { pnl: PnL }) {
               fontWeight={600}
               fill="var(--text-dim)"
             >
-              {thbShort(Math.abs(s.delta))}
+              {moneyShort(Math.abs(s.delta), pnl.currency)}
             </text>
             <text
               x={x + barW / 2}

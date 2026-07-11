@@ -4,12 +4,15 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useDeck } from "@/store/useDeck";
 import { EventMeta } from "@/data/runOfShow";
+import { guestLabelFor } from "@/data/projectTemplates";
 
-const FIELDS: { key: keyof EventMeta; label: string; placeholder: string; area?: boolean }[] = [
+const fieldsFor = (
+  guestLabel: string
+): { key: keyof EventMeta; label: string; placeholder: string; area?: boolean }[] => [
   { key: "venue", label: "Venue", placeholder: "e.g. JW Marriott Phuket Resort & Spa" },
   { key: "date", label: "Date", placeholder: "e.g. Thursday 31 December 2026" },
   { key: "timing", label: "Timing", placeholder: "e.g. 19:00 – 01:00 (6 hours)" },
-  { key: "guests", label: "Guests", placeholder: "e.g. 200 adults + 30 children" },
+  { key: "guests", label: guestLabel, placeholder: "e.g. 200 adults + 30 children" },
   { key: "spaces", label: "Spaces", placeholder: "e.g. Ballroom → Lobby Pond" },
   { key: "theme", label: "Theme", placeholder: "e.g. Emerald & Gold, garden-in-bloom" },
   { key: "concept", label: "Concept", placeholder: "The story / shape of the night…", area: true },
@@ -19,6 +22,7 @@ export function EventSettingsModal({ onClose }: { onClose: () => void }) {
   const meta = useDeck((s) => s.meta);
   const updateEventMeta = useDeck((s) => s.updateEventMeta);
   const [draft, setDraft] = useState<EventMeta>({ ...meta });
+  const FIELDS = fieldsFor(guestLabelFor(meta.eventType));
 
   const save = () => {
     updateEventMeta(draft);

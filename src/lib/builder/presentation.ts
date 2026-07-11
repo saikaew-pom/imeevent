@@ -7,7 +7,7 @@ import { getPhotosBucket } from "@/lib/cf";
 import { FinancialAssumptions } from "@/data/financials";
 import { computePnL } from "@/lib/pnl";
 import { finaleConcepts } from "@/data/finale";
-import { thb, pct } from "@/lib/format";
+import { money, pct } from "@/lib/format";
 
 interface SlideCopy {
   title: string;
@@ -172,7 +172,7 @@ function buildStaticPrompt(key: StaticSlideKey, ctx: StaticSlideContext): string
     }
     case "numbers": {
       const pnl = computePnL(ctx.financials, orderActs(ctx.lineup, ctx.customActs).reduce((s, a) => s + a.costTHB, 0));
-      return `${intro}\n\nThis is the NUMBERS/P&L slide. Revenue ${thb(pnl.totalRevenue)}, total cost ${thb(pnl.totalCost)}, gross profit ${thb(pnl.grossProfit)}, margin ${pct(pnl.marginPct)}, ${pnl.pax} guests, break-even at ${Math.ceil(pnl.breakEvenQty)} ${pnl.primaryTierName.toLowerCase()}.\n\nWrite a confident title and short body framing the revenue model for the client (the numbers themselves are shown separately as stat cards — do not restate every figure, just the story).\n\n${responseSpec}`;
+      return `${intro}\n\nThis is the NUMBERS/P&L slide. Revenue ${money(pnl.totalRevenue, pnl.currency)}, total cost ${money(pnl.totalCost, pnl.currency)}, gross profit ${money(pnl.grossProfit, pnl.currency)}, margin ${pct(pnl.marginPct)}, ${pnl.pax} guests, break-even at ${Math.ceil(pnl.breakEvenQty)} ${pnl.primaryTierName.toLowerCase()}.\n\nWrite a confident title and short body framing the revenue model for the client (the numbers themselves are shown separately as stat cards — do not restate every figure, just the story).\n\n${responseSpec}`;
     }
   }
 }

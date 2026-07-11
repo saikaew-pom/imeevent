@@ -53,6 +53,7 @@ export interface CostLine {
   value: number; // THB
   note?: string; // extra hover context
   ent?: boolean; // counts toward the "entertainment %" benchmark
+  day?: number; // 1-based event day/function this line belongs to — enables per-day spend breakdown
 }
 
 // 2026 default cost lines — seeded off the 2025 actuals and adjusted for the JW

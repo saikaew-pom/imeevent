@@ -4,7 +4,8 @@ import { getSessionUser } from "@/lib/auth/session";
 import { listUserProjects } from "@/lib/auth/queries";
 import { SignOutButton } from "@/components/SignOutButton";
 import { ink, sub, border, hoverBg } from "@/lib/notionTheme";
-import { createProjectAction } from "./actions";
+import { createProjectFromTemplateAction } from "./actions";
+import { NewProjectWizard } from "@/components/projects/NewProjectWizard";
 
 export default async function ProjectsPage() {
   const user = await getSessionUser();
@@ -42,28 +43,9 @@ export default async function ProjectsPage() {
           Signed in as {user.name} ({user.email})
         </p>
 
-        {/* Create a new project — self-serve for any signed-in user */}
-        <form
-          action={createProjectAction}
-          className="flex items-center gap-2 rounded-[8px] p-3 mb-8"
-          style={{ border: `1px solid ${border}` }}
-        >
-          <input
-            name="name"
-            placeholder="New project name (e.g. Sarah & Tom Wedding)"
-            required
-            maxLength={80}
-            className="text-[13.5px] rounded-[6px] px-3 py-2 flex-1"
-            style={{ border: `1px solid ${border}` }}
-          />
-          <button
-            type="submit"
-            className="text-[13.5px] font-medium rounded-[6px] px-4 py-2 shrink-0"
-            style={{ background: ink, color: "#fff" }}
-          >
-            Create project
-          </button>
-        </form>
+        {/* Create a new project — self-serve for any signed-in user, via the
+            archetype wizard (pick a shape, answer a short brief). */}
+        <NewProjectWizard action={createProjectFromTemplateAction} />
 
         {projects.length === 0 ? (
           <div

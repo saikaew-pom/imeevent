@@ -6,6 +6,7 @@ import { acts } from "@/data/acts";
 import { useDeck } from "@/store/useDeck";
 import { useProject } from "@/components/ProjectProvider";
 import { EventSettingsModal } from "@/components/dashboard/EventSettingsModal";
+import { guestLabelFor } from "@/data/projectTemplates";
 
 const modules = [
   {
@@ -48,7 +49,7 @@ export default function Home() {
   const snapshot: [string, string][] = [
     ["Date", meta.date],
     ["Timing", meta.timing],
-    ["Guests", meta.guests],
+    [guestLabelFor(meta.eventType), meta.guests],
     ["Spaces", meta.spaces],
   ];
 

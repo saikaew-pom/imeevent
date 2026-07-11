@@ -9,7 +9,8 @@ import { curvePoints, lineupTotals, orderedLineup } from "@/lib/analysis";
 import { liveBeatEnergy } from "@/lib/programEnergy";
 import { computePnL, PnL } from "@/lib/pnl";
 import { finaleConcepts, goldenBloom } from "@/data/finale";
-import { thb, pct } from "@/lib/format";
+import { guestLabelFor } from "@/data/projectTemplates";
+import { money, pct } from "@/lib/format";
 import { findAct, Act, PLACEHOLDER_PHOTO } from "@/data/acts";
 import { Slide as SlideData } from "@/data/slides";
 import { SlideEditorModal } from "@/components/present/SlideEditorModal";
@@ -692,11 +693,49 @@ function LineupSlide({
   );
 }
 
+// Generic (archetype-agnostic) success criteria for any project that isn't
+// JW — JW keeps its own bespoke Golden Bloom brief below.
+const genericFinaleCriteria = (guestLabel: string) => [
+  "The room ends on its highest note.",
+  "One continuous rise — no flat middle before it.",
+  `The moment ${guestLabel.toLowerCase()} remember most.`,
+];
+
 function FinaleSlide({ slide, canWrite, generating, onGenerate, onSave, onReset }: StaticSlideProps) {
   const [editing, setEditing] = useState(false);
-  const title = slide?.title || goldenBloom.title;
-  const body = slide?.body || goldenBloom.concept;
-  const image = slide?.imageUrl || finaleConcepts[1].image;
+  const meta = useDeck((s) => s.meta);
+  const program = useDeck((s) => s.program);
+  const slug = useProjectSlug();
+  // JW's live deck has never saved its own finale slide, so it still renders
+  // through this fallback — keep its exact bespoke Golden Bloom brief. Every
+  // other project (including new galas from the wizard) gets a generic,
+  // archetype-aware fallback instead of JW's specific creative content.
+  const isJWGala = slug === "jw-gala-garden-night";
+
+  // The emotional peak is usually not the chronologically last beat (e.g. an
+  // incentive trip's Awards Night is followed by a leisure day and
+  // departure) — prefer the beat tagged "summit", falling back to the very
+  // last beat only if none is tagged.
+  const lastBeat = program.find((b) => b.peak === "summit") ?? program[program.length - 1];
+  const defaultTitle = isJWGala
+    ? goldenBloom.title
+    : meta.eventType === "incentive"
+    ? "Awards Night"
+    : "The Finale";
+  const defaultBody = isJWGala
+    ? goldenBloom.concept
+    : lastBeat?.what ||
+      `The closing moment — the last impression ${guestLabelFor(
+        meta.eventType
+      ).toLowerCase()} take with them.`;
+  const defaultImage = isJWGala ? finaleConcepts[1].image : lastBeat?.media?.photo;
+  const criteria = isJWGala
+    ? goldenBloom.successCriteria.slice(0, 3)
+    : genericFinaleCriteria(guestLabelFor(meta.eventType));
+
+  const title = slide?.title || defaultTitle;
+  const body = slide?.body || defaultBody;
+  const image = slide?.imageUrl || defaultImage;
 
   return (
     <Slide>
@@ -712,13 +751,15 @@ function FinaleSlide({ slide, canWrite, generating, onGenerate, onSave, onReset 
         />
       </div>
       {slide?.subtitle && <p className="text-[13px] emerald-text mb-3">{slide.subtitle}</p>}
-      <div className="grid md:grid-cols-2 gap-6 items-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={image} alt="Golden Bloom" className="w-full rounded-2xl border hairline" />
+      <div className={image ? "grid md:grid-cols-2 gap-6 items-center" : ""}>
+        {image && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={image} alt={title} className="w-full rounded-2xl border hairline" />
+        )}
         <div>
           <p className="text-[15px] text-[var(--text-dim)] leading-relaxed mb-4">{body}</p>
           <ul className="space-y-1.5">
-            {goldenBloom.successCriteria.slice(0, 3).map((s) => (
+            {criteria.map((s) => (
               <li key={s} className="flex gap-2 text-[13px] text-[var(--text-dim)]">
                 <span className="emerald-text">✓</span>
                 {s}
@@ -729,7 +770,7 @@ function FinaleSlide({ slide, canWrite, generating, onGenerate, onSave, onReset 
       </div>
       {editing && (
         <SlideEditorModal
-          initial={{ title, subtitle: slide?.subtitle ?? "", body, imageUrl: image }}
+          initial={{ title, subtitle: slide?.subtitle ?? "", body, imageUrl: image ?? "" }}
           onClose={() => setEditing(false)}
           onSave={onSave}
         />
@@ -748,8 +789,9 @@ function NumbersSlide({
   onReset,
 }: StaticSlideProps & { pnl: PnL }) {
   const [editing, setEditing] = useState(false);
+  const meta = useDeck((s) => s.meta);
   const title = slide?.title || "Revenue model at a glance";
-  const defaultBody = `${pnl.pax} guests · entertainment ${thb(pnl.entertainment)} (${pct(
+  const defaultBody = `${pnl.pax} ${guestLabelFor(meta.eventType).toLowerCase()} · entertainment ${money(pnl.entertainment, pnl.currency)} (${pct(
     pnl.entertainmentPctRev
   )} of revenue) · break-even at ${Math.ceil(pnl.breakEvenQty)} ${pnl.primaryTierName.toLowerCase()}. Planning estimates — costs are editable placeholders.`;
   const body = slide?.body || defaultBody;
@@ -769,9 +811,9 @@ function NumbersSlide({
       </div>
       {slide?.subtitle && <p className="text-[13px] emerald-text mb-3">{slide.subtitle}</p>}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <BigStat label="Revenue" value={thb(pnl.totalRevenue)} tone="emerald" />
-        <BigStat label="Total cost" value={thb(pnl.totalCost)} tone="danger" />
-        <BigStat label="Gross profit" value={thb(pnl.grossProfit)} tone="gold" />
+        <BigStat label="Revenue" value={money(pnl.totalRevenue, pnl.currency)} tone="emerald" />
+        <BigStat label="Total cost" value={money(pnl.totalCost, pnl.currency)} tone="danger" />
+        <BigStat label="Gross profit" value={money(pnl.grossProfit, pnl.currency)} tone="gold" />
         <BigStat label="Margin" value={pct(pnl.marginPct)} tone="gold" />
       </div>
       <p className="text-[13px] text-[var(--text-faint)] mt-6">{body}</p>

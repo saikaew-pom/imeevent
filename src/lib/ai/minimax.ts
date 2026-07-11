@@ -10,7 +10,10 @@ interface ChatCompletionResponse {
 }
 
 // Drafts short slide copy from a plain-text prompt describing a beat.
-export async function generateSlideCopy(prompt: string): Promise<string> {
+// maxTokens defaults to the small slide-copy budget; the project-overlay
+// generator (a whole program's worth of renamed blocks + tasks) passes a
+// higher budget explicitly.
+export async function generateSlideCopy(prompt: string, maxTokens = 600): Promise<string> {
   const apiKey = await getMinimaxApiKey();
   const res = await fetch(`${BASE_URL}/chat/completions`, {
     method: "POST",
@@ -21,7 +24,7 @@ export async function generateSlideCopy(prompt: string): Promise<string> {
     body: JSON.stringify({
       model: TEXT_MODEL,
       messages: [{ role: "user", content: prompt }],
-      max_completion_tokens: 600,
+      max_completion_tokens: maxTokens,
       temperature: 0.8,
       thinking: { type: "disabled" },
     }),

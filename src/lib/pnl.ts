@@ -1,5 +1,6 @@
 import { FinancialAssumptions } from "@/data/financials";
 import { CostGroupKey } from "@/data/costStructure";
+import { CurrencyCode } from "@/lib/format";
 
 export interface GroupTotal {
   key: CostGroupKey;
@@ -26,6 +27,7 @@ export interface PnL {
   entertainment: number; // ent-tagged lines + show acts
   entertainmentPctRev: number;
   pax: number;
+  currency: CurrencyCode; // the project's currency (defaults THB on legacy records)
 }
 
 // showActsTHB comes from the built lineup (sum of act costs). It is added to the
@@ -85,5 +87,6 @@ export function computePnL(
     entertainment,
     entertainmentPctRev: totalRevenue ? (entertainment / totalRevenue) * 100 : 0,
     pax,
+    currency: f.currency ?? "THB",
   };
 }

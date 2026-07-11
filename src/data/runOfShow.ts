@@ -16,6 +16,7 @@ export interface BeatLink {
 
 export interface Beat {
   id: string;
+  day?: number; // 1-based event day; absent/1 = single-day event (JW). Enables multi-day timelines.
   time: string;
   durationMin: number;
   segment: string;
@@ -31,6 +32,8 @@ export interface Beat {
   refVideos?: string[]; // unlimited pasted YouTube/Vimeo reference links
   linkedTalent?: string[]; // talent entity ids (MC, band, performers, vendors)
   custom?: boolean; // true if added by the user in the planner (not the original run of show)
+  audience?: "all" | "core" | "optional"; // who this block is for — mainly for incentive/conference programs
+  attire?: string; // freeform dress code for this block, e.g. "Black tie"
 }
 
 export type FindingSeverity = "risk" | "gap" | "tip";
@@ -67,6 +70,8 @@ export interface EventMeta {
   theme: string;
   spaces: string;
   concept: string;
+  eventType?: string; // archetype id from projectTemplates.ts, e.g. "wedding"
+  days?: number; // total days in the program (1 = single-day)
 }
 
 export const EMPTY_EVENT_META: EventMeta = {

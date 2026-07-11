@@ -10,7 +10,7 @@ import {
   SLOT_ORDER,
 } from "@/lib/analysis";
 import { runOfShow } from "@/data/runOfShow";
-import { thb, energyColor } from "@/lib/format";
+import { money, energyColor } from "@/lib/format";
 
 // The JW confirmed lineup as a ghost reference curve.
 const jwGhost = runOfShow
@@ -24,6 +24,7 @@ export function LineupPanel() {
   const reorderSlot = useDeck((s) => s.reorderSlot);
   const clearLineup = useDeck((s) => s.clearLineup);
   const myRole = useDeck((s) => s.myRole);
+  const currency = useDeck((s) => s.financials.currency ?? "THB");
   const canWrite = myRole === "owner" || myRole === "editor";
 
   const points = curvePoints(lineup, customActs);
@@ -69,7 +70,7 @@ export function LineupPanel() {
       {/* Totals */}
       {totals.count > 0 && (
         <section className="grid grid-cols-3 gap-2">
-          <Stat label="Talent cost" value={thb(totals.totalCost)} />
+          <Stat label="Talent cost" value={money(totals.totalCost, currency)} />
           <Stat label="Stage time" value={`${totals.totalDuration} min`} />
           <Stat label="Avg energy" value={`${totals.avgEnergy.toFixed(1)}/10`} />
         </section>
