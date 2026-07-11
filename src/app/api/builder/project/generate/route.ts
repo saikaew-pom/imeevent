@@ -43,22 +43,29 @@ export async function POST(req: NextRequest) {
 
   const setup = generateProjectSetup(template, eventDate, brief);
 
-  const overlay = await (async () => {
-    try {
-      const prompt = buildOverlayPrompt(template, setup, brief, body?.notes ?? "");
-      const raw = await generateSlideCopy(prompt, OVERLAY_MAX_TOKENS);
-      return parseAIOverlay(raw, setup.program.length);
-    } catch {
-      return null;
-    }
-  })();
-
-  // The overlay (if it succeeded) writes a richer AI concept over the plain
-  // skeleton's — use that for the theme prompt too, since it's more specific
-  // than the raw brief. Theme generation fails independently of the overlay:
-  // one succeeding is enough to show the user something.
-  const themeMeta = overlay?.concept ? { ...setup.meta, concept: overlay.concept } : setup.meta;
-  const theme: EventTheme | null = await generateEventTheme(themeMeta).catch(() => null);
+  // Overlay and theme are independent AI calls — run them in parallel rather
+  // than sequentially (the theme prompt uses the plain brief-derived concept
+  // instead of waiting for the overlay's richer one) so total wait time is
+  // whichever is slower, not the sum of both. Each fails independently: one
+  // succeeding is enough to show the user something, and every failure is
+  // logged so a bad response is visible in `wrangler tail` instead of just
+  // silently vanishing.
+  const [overlay, theme] = await Promise.all([
+    (async () => {
+      try {
+        const prompt = buildOverlayPrompt(template, setup, brief, body?.notes ?? "");
+        const raw = await generateSlideCopy(prompt, OVERLAY_MAX_TOKENS);
+        return parseAIOverlay(raw, setup.program.length);
+      } catch (e) {
+        console.error("Project overlay generation failed:", e);
+        return null;
+      }
+    })(),
+    generateEventTheme(setup.meta).catch((e) => {
+      console.error("Project theme generation failed:", e);
+      return null as EventTheme | null;
+    }),
+  ]);
 
   return NextResponse.json({ ok: Boolean(overlay || theme), overlay, theme });
 }
