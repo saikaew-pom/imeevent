@@ -106,8 +106,10 @@ structural refactor first, out of scope here).
 - [x] H2: API route — `POST /api/builder/theme/generate`
 - [x] H3: store wiring — `aiTheme` hydrate + `generateAITheme` action
 - [x] H4: UI — theme section in Event Settings (generate/regenerate + swatches) + conditional dashboard hero display (JW-safe: renders nothing without a saved theme)
-- [ ] H5: this file updated
-- [ ] H6: verify locally + commit + deploy + verify in production
+- [x] H5: this file updated
+- [x] H6: verified locally (real MiniMax generation, correct persistence/display in dashboard + settings modal, JW untouched) + committed + deployed + verified in production
+
+**Shipped:** commit `634f39f`, no migration needed, deployed (Version ID `0116e337-93d1-46cd-abe1-56ec14562bec`). JW's live guest-passcode dashboard confirmed unaffected post-deploy.
 
 ## Phase I — Company Library core (Media + Show & Decor)
 
