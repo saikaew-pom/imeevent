@@ -1,10 +1,9 @@
 import "server-only";
 import { EventMeta } from "@/data/runOfShow";
-import { EventTheme, ThemeColor } from "@/data/theme";
+import { EventTheme, sanitizeEventTheme } from "@/data/theme";
 import { generateSlideCopy } from "@/lib/ai/minimax";
 import { getProjectTemplate } from "@/data/projectTemplates";
 
-const HEX_RE = /^#[0-9a-f]{6}$/i;
 const GENERATION_TIMEOUT_MS = 45_000;
 
 function buildPrompt(meta: EventMeta): string {
@@ -37,31 +36,11 @@ function parseTheme(raw: string): EventTheme {
   } catch {
     throw new Error("AI returned a theme in an unparseable format.");
   }
-  if (!parsed || typeof parsed !== "object") {
-    throw new Error("AI returned an invalid theme.");
-  }
-  const obj = parsed as Record<string, unknown>;
-  const name = typeof obj.name === "string" ? obj.name.trim().slice(0, 80) : "";
-  const description =
-    typeof obj.description === "string" ? obj.description.trim().slice(0, 400) : "";
-  const rawPalette = Array.isArray(obj.palette) ? obj.palette : [];
-  const palette: ThemeColor[] = rawPalette
-    .filter(
-      (c): c is { label: unknown; hex: unknown } => Boolean(c) && typeof c === "object"
-    )
-    .map((c) => ({
-      label: typeof c.label === "string" ? c.label.trim().slice(0, 40) : "",
-      hex: typeof c.hex === "string" ? c.hex.trim() : "",
-    }))
-    .filter((c) => HEX_RE.test(c.hex))
-    .map((c) => ({ label: c.label || c.hex.toUpperCase(), hex: c.hex.toUpperCase() }))
-    .slice(0, 6);
-
-  if (!name || !description || palette.length < 3) {
+  const theme = sanitizeEventTheme(parsed);
+  if (!theme) {
     throw new Error("AI returned an incomplete theme — try regenerating.");
   }
-
-  return { name, description, palette, generatedAt: new Date().toISOString() };
+  return theme;
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {

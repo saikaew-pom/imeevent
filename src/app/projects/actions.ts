@@ -15,6 +15,7 @@ import {
 import { setProjectState } from "@/lib/builder/projectState";
 import { createTasksBulk, BulkTaskInput } from "@/lib/builder/tasks";
 import { getEventPreset, offsetToDate } from "@/data/eventPresets";
+import { sanitizeEventTheme } from "@/data/theme";
 import {
   getProjectTemplate,
   generateProjectSetup,
@@ -100,11 +101,29 @@ export async function createProjectFromTemplateAction(formData: FormData) {
     intent === "use-ai" && aiOverlayRaw ? parseAIOverlay(aiOverlayRaw, baseSetup.program.length) : null;
   const setup = applyAIOverlay(baseSetup, overlay);
 
-  await Promise.all([
+  // Same "never trust the client echo as-is" rule as the overlay above —
+  // re-validated from scratch, and only applied when the user actually
+  // accepted the AI proposal (never on "Skip AI"). A malformed/tampered
+  // value is just discarded rather than allowed to throw mid-action (the
+  // project row above is already created by this point).
+  const aiThemeRaw = String(formData.get("aiTheme") ?? "").trim();
+  let themeCandidate: unknown = null;
+  if (intent === "use-ai" && aiThemeRaw) {
+    try {
+      themeCandidate = JSON.parse(aiThemeRaw);
+    } catch {
+      themeCandidate = null;
+    }
+  }
+  const theme = sanitizeEventTheme(themeCandidate);
+
+  const writes = [
     setProjectState(project.id, "meta", setup.meta, user.id),
     setProjectState(project.id, "program", setup.program, user.id),
     setProjectState(project.id, "financials", setup.financials, user.id),
-  ]);
+  ];
+  if (theme) writes.push(setProjectState(project.id, "aiTheme", theme, user.id));
+  await Promise.all(writes);
 
   const rows: BulkTaskInput[] = [];
   if (setup.taskPresetId) {

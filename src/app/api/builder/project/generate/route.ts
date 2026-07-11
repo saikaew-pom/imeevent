@@ -8,6 +8,8 @@ import {
   ProjectBriefInput,
 } from "@/data/projectTemplates";
 import { generateSlideCopy } from "@/lib/ai/minimax";
+import { generateEventTheme } from "@/lib/builder/theme";
+import { EventTheme } from "@/data/theme";
 
 const OVERLAY_MAX_TOKENS = 2200;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -30,22 +32,33 @@ export async function POST(req: NextRequest) {
 
   const templateId = body?.templateId;
   const template = templateId ? getProjectTemplate(templateId) : undefined;
-  if (!template || !body?.brief) {
+  const brief = body?.brief;
+  if (!template || !brief) {
     return NextResponse.json({ error: "Missing or unknown template/brief." }, { status: 400 });
   }
-  const eventDate = body.eventDate ?? "";
+  const eventDate = body?.eventDate ?? "";
   if (template.days.length > 0 && !DATE_RE.test(eventDate)) {
     return NextResponse.json({ error: "A valid event date is required." }, { status: 400 });
   }
 
-  const setup = generateProjectSetup(template, eventDate, body.brief);
+  const setup = generateProjectSetup(template, eventDate, brief);
 
-  try {
-    const prompt = buildOverlayPrompt(template, setup, body.brief, body.notes ?? "");
-    const raw = await generateSlideCopy(prompt, OVERLAY_MAX_TOKENS);
-    const overlay = parseAIOverlay(raw, setup.program.length);
-    return NextResponse.json({ ok: true, overlay });
-  } catch {
-    return NextResponse.json({ ok: false, overlay: null });
-  }
+  const overlay = await (async () => {
+    try {
+      const prompt = buildOverlayPrompt(template, setup, brief, body?.notes ?? "");
+      const raw = await generateSlideCopy(prompt, OVERLAY_MAX_TOKENS);
+      return parseAIOverlay(raw, setup.program.length);
+    } catch {
+      return null;
+    }
+  })();
+
+  // The overlay (if it succeeded) writes a richer AI concept over the plain
+  // skeleton's — use that for the theme prompt too, since it's more specific
+  // than the raw brief. Theme generation fails independently of the overlay:
+  // one succeeding is enough to show the user something.
+  const themeMeta = overlay?.concept ? { ...setup.meta, concept: overlay.concept } : setup.meta;
+  const theme: EventTheme | null = await generateEventTheme(themeMeta).catch(() => null);
+
+  return NextResponse.json({ ok: Boolean(overlay || theme), overlay, theme });
 }

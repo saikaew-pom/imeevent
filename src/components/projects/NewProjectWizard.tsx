@@ -13,6 +13,7 @@ import {
   BudgetPosture,
 } from "@/data/projectTemplates";
 import { getEventPreset } from "@/data/eventPresets";
+import { EventTheme } from "@/data/theme";
 import { CURRENCIES, CurrencyCode, money } from "@/lib/format";
 import { ink, sub, border, hoverBg } from "@/lib/notionTheme";
 
@@ -132,11 +133,12 @@ const inputClass = "text-[13.5px] rounded-[6px] px-3 py-2 w-full";
 
 interface Preview {
   setup: GeneratedProjectSetup;
-  overlay: AIOverlay;
+  overlay: AIOverlay | null;
+  theme: EventTheme | null;
 }
 
 function PreviewPanel({ template, preview }: { template: ProjectTemplate; preview: Preview }) {
-  const { setup } = preview;
+  const { setup, theme } = preview;
   const byDay = new Map<number, typeof setup.program>();
   for (const b of setup.program) {
     const d = b.day ?? 1;
@@ -167,6 +169,30 @@ function PreviewPanel({ template, preview }: { template: ProjectTemplate; previe
           {setup.meta.date}
           {setup.meta.timing ? ` · ${setup.meta.timing}` : ""}
         </p>
+      )}
+
+      {theme && (
+        <div>
+          <span className="text-[11px] uppercase tracking-wide font-semibold" style={{ color: sub }}>
+            Suggested theme
+          </span>
+          <p className="text-[13px] font-semibold mt-1" style={{ color: ink }}>
+            {theme.name}
+          </p>
+          <p className="text-[12.5px] mt-0.5" style={{ color: sub }}>
+            {theme.description}
+          </p>
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            {theme.palette.map((c) => (
+              <span
+                key={c.hex}
+                className="w-4 h-4 rounded-full shrink-0 inline-block"
+                title={`${c.label} · ${c.hex}`}
+                style={{ background: c.hex, border: "1px solid rgba(0,0,0,0.15)" }}
+              />
+            ))}
+          </div>
+        </div>
       )}
 
       {byDay.size > 0 && (
@@ -256,10 +282,14 @@ export function NewProjectWizard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ templateId: template.id, eventDate, notes, brief }),
       });
-      const data = (await res.json()) as { ok: boolean; overlay: AIOverlay | null };
-      if (data.ok && data.overlay) {
+      const data = (await res.json()) as {
+        ok: boolean;
+        overlay: AIOverlay | null;
+        theme: EventTheme | null;
+      };
+      if (data.ok) {
         const setup = applyAIOverlay(generateProjectSetup(template, eventDate, brief), data.overlay);
-        setPreview({ setup, overlay: data.overlay });
+        setPreview({ setup, overlay: data.overlay, theme: data.theme });
       } else {
         setAiError("Couldn't generate right now — you can still create with the standard template below.");
       }
@@ -318,7 +348,8 @@ export function NewProjectWizard({
       {step === 2 && template && (
         <form action={action} ref={formRef} className="space-y-4">
           <input type="hidden" name="templateId" value={template.id} />
-          <input type="hidden" name="aiOverlay" value={preview ? JSON.stringify(preview.overlay) : ""} />
+          <input type="hidden" name="aiOverlay" value={preview?.overlay ? JSON.stringify(preview.overlay) : ""} />
+          <input type="hidden" name="aiTheme" value={preview?.theme ? JSON.stringify(preview.theme) : ""} />
 
           <Field label="Project name" htmlFor="np-name">
             <input
