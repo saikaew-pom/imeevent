@@ -91,7 +91,9 @@ JW's project (`jw-gala-garden-night`, guest passcode `cheewitcheewa`) must stay 
 - [x] G3: UI — Duplicate control on `/projects` list
 - [x] G4: this file updated
 - [x] G5: verify locally (custom acts/talent-id remap/tasks/media/program all confirmed correct on a real duplicate; source project + JW untouched)
-- [ ] G6: commit + deploy + verify in production
+- [x] G6: commit + deploy + verify in production
+
+**Shipped:** commit `83aaccd`, no migration needed, deployed (Version ID `a38a9670-301a-45d0-be37-577ea2bbde47`). JW's live guest-passcode dashboard confirmed unaffected post-deploy.
 
 ## Phase H — AI theming
 
