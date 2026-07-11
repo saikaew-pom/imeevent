@@ -1,27 +1,41 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
-import { listUsers, listProjects, listProjectMembers } from "@/lib/auth/queries";
+import {
+  listCompanies,
+  listCompanyUsers,
+  listCompanyProjects,
+  listProjectMembers,
+  listAdminCompanyIds,
+  CompanyRow,
+} from "@/lib/auth/queries";
 import { SignOutButton } from "@/components/SignOutButton";
 import { ink, sub, border, hoverBg, danger } from "@/lib/notionTheme";
 import {
-  createUserAction,
-  createProjectAction,
+  createCompanyAction,
+  renameCompanyAction,
+  createUserInCompanyAction,
+  setCompanyMemberRoleAction,
+  removeCompanyMemberAction,
   deleteUserAction,
+  createProjectInCompanyAction,
   assignMemberAction,
   removeMemberAction,
   setPasscodeAction,
+  archiveProjectAction,
+  restoreProjectAction,
 } from "./actions";
 
 export default async function AdminPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-  if (!user.isAdmin) redirect("/projects");
 
-  const [users, projects] = await Promise.all([listUsers(), listProjects()]);
-  const membersByProject = await Promise.all(
-    projects.map(async (p) => ({ project: p, members: await listProjectMembers(p.id) }))
-  );
+  const isSuperAdmin = user.isAdmin;
+  const adminCompanyIds = isSuperAdmin ? null : new Set(await listAdminCompanyIds(user.id));
+  if (!isSuperAdmin && adminCompanyIds!.size === 0) redirect("/projects");
+
+  const allCompanies = await listCompanies();
+  const companies = isSuperAdmin ? allCompanies : allCompanies.filter((c) => adminCompanyIds!.has(c.id));
 
   return (
     <div className="min-h-screen font-sans" style={{ background: "#ffffff", color: ink }}>
@@ -45,248 +59,380 @@ export default async function AdminPage() {
         </div>
       </header>
 
-      <section className="mx-auto max-w-[880px] px-6 py-12 space-y-12">
-        {/* Create user */}
-        <div>
-          <h2 className="text-[16px] font-semibold mb-3">Add a user</h2>
-          <form
-            action={createUserAction}
-            className="grid md:grid-cols-4 gap-2 items-start rounded-[8px] p-4"
-            style={{ border: `1px solid ${border}` }}
-          >
-            <input
-              name="name"
-              placeholder="Name"
-              required
-              className="text-[13.5px] rounded-[6px] px-3 py-2"
+      <section className="mx-auto max-w-[880px] px-6 py-12 space-y-16">
+        {isSuperAdmin && (
+          <div>
+            <h2 className="text-[16px] font-semibold mb-3">Create a company</h2>
+            <form
+              action={createCompanyAction}
+              className="flex items-center gap-2 rounded-[8px] p-4"
               style={{ border: `1px solid ${border}` }}
-            />
-            <input
-              name="email"
-              type="email"
-              placeholder="Email"
-              required
-              className="text-[13.5px] rounded-[6px] px-3 py-2"
-              style={{ border: `1px solid ${border}` }}
-            />
-            <input
-              name="password"
-              type="password"
-              placeholder="Password (8+ chars)"
-              required
-              minLength={8}
-              className="text-[13.5px] rounded-[6px] px-3 py-2"
-              style={{ border: `1px solid ${border}` }}
-            />
-            <button
-              type="submit"
-              className="text-[13.5px] font-medium rounded-[6px] px-4 py-2"
-              style={{ background: ink, color: "#fff" }}
             >
-              Create user
-            </button>
-            <label className="flex items-center gap-1.5 text-[12.5px] md:col-span-4" style={{ color: sub }}>
-              <input type="checkbox" name="isAdmin" /> Grant admin access
-            </label>
-          </form>
-        </div>
+              <input
+                name="name"
+                placeholder="Company name"
+                required
+                maxLength={80}
+                className="text-[13.5px] rounded-[6px] px-3 py-2 flex-1"
+                style={{ border: `1px solid ${border}` }}
+              />
+              <button
+                type="submit"
+                className="text-[13.5px] font-medium rounded-[6px] px-4 py-2 shrink-0"
+                style={{ background: ink, color: "#fff" }}
+              >
+                Create company
+              </button>
+            </form>
+          </div>
+        )}
 
-        {/* Users list */}
-        <div>
-          <h2 className="text-[16px] font-semibold mb-3">
-            All users ({users.filter((u) => !isGuestEmail(u.email)).length})
-          </h2>
-          <div className="space-y-1.5">
-            {users
-              .filter((u) => !isGuestEmail(u.email))
-              .map((u) => (
+        {companies.map((company) => (
+          <CompanySection key={company.id} company={company} isSuperAdmin={isSuperAdmin} />
+        ))}
+      </section>
+    </div>
+  );
+}
+
+async function CompanySection({
+  company,
+  isSuperAdmin,
+}: {
+  company: CompanyRow;
+  isSuperAdmin: boolean;
+}) {
+  const [companyUsers, projects, allProjects] = await Promise.all([
+    listCompanyUsers(company.id),
+    listCompanyProjects(company.id),
+    listCompanyProjects(company.id, { includeArchived: true }),
+  ]);
+  const archived = allProjects.filter((p) => p.archivedAt);
+  const realUsers = companyUsers.filter((u) => !isGuestEmail(u.email));
+  const membersByProject = await Promise.all(
+    projects.map(async (p) => ({ project: p, members: await listProjectMembers(p.id) }))
+  );
+
+  return (
+    <div className="space-y-10 pb-16" style={{ borderBottom: `1px solid ${border}` }}>
+      <div>
+        <p className="text-[11px] font-medium tracking-wide uppercase mb-1.5" style={{ color: sub }}>
+          Company
+        </p>
+        <h2 className="text-[20px] font-semibold mb-3">{company.name}</h2>
+        <form action={renameCompanyAction} className="flex items-center gap-2">
+          <input type="hidden" name="companyId" value={company.id} />
+          <input
+            name="name"
+            defaultValue={company.name}
+            className="text-[13px] rounded-[6px] px-2.5 py-1.5"
+            style={{ border: `1px solid ${border}` }}
+          />
+          <button
+            type="submit"
+            className="text-[12px] font-medium rounded-[6px] px-3 py-1.5"
+            style={{ border: `1px solid ${border}`, color: sub }}
+          >
+            Rename
+          </button>
+        </form>
+      </div>
+
+      {/* Add a user */}
+      <div>
+        <h3 className="text-[14px] font-semibold mb-3">Add a user</h3>
+        <form
+          action={createUserInCompanyAction}
+          className="grid md:grid-cols-4 gap-2 items-start rounded-[8px] p-4"
+          style={{ border: `1px solid ${border}` }}
+        >
+          <input type="hidden" name="companyId" value={company.id} />
+          <input
+            name="name"
+            placeholder="Name"
+            required
+            className="text-[13.5px] rounded-[6px] px-3 py-2"
+            style={{ border: `1px solid ${border}` }}
+          />
+          <input
+            name="email"
+            type="email"
+            placeholder="Email"
+            required
+            className="text-[13.5px] rounded-[6px] px-3 py-2"
+            style={{ border: `1px solid ${border}` }}
+          />
+          <input
+            name="password"
+            type="password"
+            placeholder="Password (8+ chars)"
+            required
+            minLength={8}
+            className="text-[13.5px] rounded-[6px] px-3 py-2"
+            style={{ border: `1px solid ${border}` }}
+          />
+          <button
+            type="submit"
+            className="text-[13.5px] font-medium rounded-[6px] px-4 py-2"
+            style={{ background: ink, color: "#fff" }}
+          >
+            Create user
+          </button>
+          <label className="flex items-center gap-1.5 text-[12.5px] md:col-span-2" style={{ color: sub }}>
+            <input type="checkbox" name="companyAdmin" /> Company admin
+          </label>
+          {isSuperAdmin && (
+            <label className="flex items-center gap-1.5 text-[12.5px] md:col-span-2" style={{ color: sub }}>
+              <input type="checkbox" name="superAdmin" /> Super admin
+            </label>
+          )}
+        </form>
+      </div>
+
+      {/* Users list */}
+      <div>
+        <h3 className="text-[14px] font-semibold mb-3">Users ({realUsers.length})</h3>
+        <div className="space-y-1.5">
+          {realUsers.map((u) => (
+            <div
+              key={u.userId}
+              className="flex items-center justify-between px-4 py-2.5 rounded-[8px]"
+              style={{ border: `1px solid ${border}` }}
+            >
+              <span className="text-[13.5px]">
+                <span className="font-medium">{u.name}</span> <span style={{ color: sub }}>{u.email}</span>
+                {u.isAdmin && (
+                  <span
+                    className="ml-2 text-[10.5px] font-medium px-1.5 py-[1px] rounded-full"
+                    style={{ border: `1px solid ${border}`, color: sub }}
+                  >
+                    super admin
+                  </span>
+                )}
+                {u.companyRole === "admin" && (
+                  <span
+                    className="ml-1 text-[10.5px] font-medium px-1.5 py-[1px] rounded-full"
+                    style={{ border: `1px solid ${border}`, color: sub }}
+                  >
+                    company admin
+                  </span>
+                )}
+              </span>
+              <div className="flex items-center gap-3 shrink-0">
+                <form action={setCompanyMemberRoleAction}>
+                  <input type="hidden" name="companyId" value={company.id} />
+                  <input type="hidden" name="userId" value={u.userId} />
+                  <input type="hidden" name="role" value={u.companyRole === "admin" ? "member" : "admin"} />
+                  <button type="submit" className="text-[12px]" style={{ color: sub }}>
+                    {u.companyRole === "admin" ? "Revoke admin" : "Make admin"}
+                  </button>
+                </form>
+                <form action={removeCompanyMemberAction}>
+                  <input type="hidden" name="companyId" value={company.id} />
+                  <input type="hidden" name="userId" value={u.userId} />
+                  <button type="submit" className="text-[12px]" style={{ color: sub }}>
+                    Remove
+                  </button>
+                </form>
+                {isSuperAdmin && (
+                  <form action={deleteUserAction}>
+                    <input type="hidden" name="userId" value={u.userId} />
+                    <button type="submit" className="text-[12px]" style={{ color: danger }}>
+                      Delete account
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Create a project */}
+      <div>
+        <h3 className="text-[14px] font-semibold mb-3">Create a project</h3>
+        <form
+          action={createProjectInCompanyAction}
+          className="flex items-center gap-2 rounded-[8px] p-4"
+          style={{ border: `1px solid ${border}` }}
+        >
+          <input type="hidden" name="companyId" value={company.id} />
+          <input
+            name="name"
+            placeholder="Project name"
+            required
+            maxLength={80}
+            className="text-[13.5px] rounded-[6px] px-3 py-2 flex-1"
+            style={{ border: `1px solid ${border}` }}
+          />
+          <button
+            type="submit"
+            className="text-[13.5px] font-medium rounded-[6px] px-4 py-2 shrink-0"
+            style={{ background: ink, color: "#fff" }}
+          >
+            Create project
+          </button>
+        </form>
+        <p className="text-[11.5px] mt-2" style={{ color: sub }}>
+          You&apos;ll be set as the owner — reassign it in the project section below.
+        </p>
+      </div>
+
+      {/* Project assignment */}
+      {membersByProject.map(({ project, members }) => {
+        const memberIds = new Set(members.map((m) => m.userId));
+        const available = realUsers.filter((u) => !memberIds.has(u.userId));
+        return (
+          <div key={project.id}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-[14px] font-semibold">Project: {project.name}</h3>
+              <form action={archiveProjectAction}>
+                <input type="hidden" name="projectId" value={project.id} />
+                <button type="submit" className="text-[12px]" style={{ color: danger }}>
+                  Archive
+                </button>
+              </form>
+            </div>
+
+            {/* Passcode */}
+            <form
+              action={setPasscodeAction}
+              className="flex items-center gap-2 rounded-[8px] p-3 mb-3"
+              style={{ border: `1px solid ${border}` }}
+            >
+              <input type="hidden" name="projectId" value={project.id} />
+              <span className="text-[12.5px] shrink-0" style={{ color: sub }}>
+                Guest passcode
+              </span>
+              <input
+                name="passcode"
+                defaultValue={project.passcode ?? ""}
+                placeholder="No passcode set"
+                className="text-[13px] rounded-[6px] px-2.5 py-1.5 flex-1"
+                style={{ border: `1px solid ${border}` }}
+              />
+              <button
+                type="submit"
+                className="text-[13px] font-medium rounded-[6px] px-3 py-1.5"
+                style={{ background: ink, color: "#fff" }}
+              >
+                Save
+              </button>
+            </form>
+            <p className="text-[11.5px] mb-3" style={{ color: sub }}>
+              Anyone with this passcode gets instant view-only access on the landing page — no account needed.
+              Clear the field to disable.
+            </p>
+
+            <div className="space-y-1.5 mb-3">
+              {members.length === 0 && (
+                <p className="text-[13px]" style={{ color: sub }}>
+                  No one is assigned to this project yet.
+                </p>
+              )}
+              {members.map((m) => (
                 <div
-                  key={u.id}
+                  key={m.userId}
                   className="flex items-center justify-between px-4 py-2.5 rounded-[8px]"
                   style={{ border: `1px solid ${border}` }}
                 >
                   <span className="text-[13.5px]">
-                    <span className="font-medium">{u.name}</span>{" "}
-                    <span style={{ color: sub }}>{u.email}</span>
-                    {u.isAdmin && (
+                    <span className="font-medium">{m.name}</span> <span style={{ color: sub }}>{m.email}</span>{" "}
+                    <span
+                      className="ml-1 text-[10.5px] font-medium px-1.5 py-[1px] rounded-full"
+                      style={{ border: `1px solid ${border}`, color: sub }}
+                    >
+                      {m.role}
+                    </span>
+                    {isGuestEmail(m.email) && (
                       <span
-                        className="ml-2 text-[10.5px] font-medium px-1.5 py-[1px] rounded-full"
+                        className="ml-1 text-[10.5px] font-medium px-1.5 py-[1px] rounded-full"
                         style={{ border: `1px solid ${border}`, color: sub }}
                       >
-                        admin
+                        via passcode
                       </span>
                     )}
                   </span>
-                  <form action={deleteUserAction}>
-                    <input type="hidden" name="userId" value={u.id} />
-                    <button
-                      type="submit"
-                      className="text-[12px]"
-                      style={{ color: danger }}
-                    >
+                  <form action={removeMemberAction}>
+                    <input type="hidden" name="projectId" value={project.id} />
+                    <input type="hidden" name="userId" value={m.userId} />
+                    <button type="submit" className="text-[12px]" style={{ color: danger }}>
                       Remove
                     </button>
                   </form>
                 </div>
               ))}
-          </div>
-        </div>
+            </div>
 
-        {/* Create a project */}
-        <div>
-          <h2 className="text-[16px] font-semibold mb-3">Create a project</h2>
-          <form
-            action={createProjectAction}
-            className="flex items-center gap-2 rounded-[8px] p-4"
-            style={{ border: `1px solid ${border}` }}
-          >
-            <input
-              name="name"
-              placeholder="Project name"
-              required
-              maxLength={80}
-              className="text-[13.5px] rounded-[6px] px-3 py-2 flex-1"
-              style={{ border: `1px solid ${border}` }}
-            />
-            <button
-              type="submit"
-              className="text-[13.5px] font-medium rounded-[6px] px-4 py-2 shrink-0"
-              style={{ background: ink, color: "#fff" }}
-            >
-              Create project
-            </button>
-          </form>
-          <p className="text-[11.5px] mt-2" style={{ color: sub }}>
-            You&apos;ll be set as the owner — reassign it in the project section
-            below.
-          </p>
-        </div>
-
-        {/* Project assignment */}
-        {membersByProject.map(({ project, members }) => {
-          const memberIds = new Set(members.map((m) => m.userId));
-          const available = users.filter(
-            (u) => !memberIds.has(u.id) && !isGuestEmail(u.email)
-          );
-          return (
-            <div key={project.id}>
-              <h2 className="text-[16px] font-semibold mb-3">
-                Project: {project.name}
-              </h2>
-
-              {/* Passcode */}
+            {available.length > 0 && (
               <form
-                action={setPasscodeAction}
-                className="flex items-center gap-2 rounded-[8px] p-3 mb-3"
-                style={{ border: `1px solid ${border}` }}
+                action={assignMemberAction}
+                className="flex items-center gap-2 rounded-[8px] p-3"
+                style={{ background: hoverBg }}
               >
                 <input type="hidden" name="projectId" value={project.id} />
-                <span className="text-[12.5px] shrink-0" style={{ color: sub }}>
-                  Guest passcode
-                </span>
-                <input
-                  name="passcode"
-                  defaultValue={project.passcode ?? ""}
-                  placeholder="No passcode set"
+                <select
+                  name="userId"
+                  required
                   className="text-[13px] rounded-[6px] px-2.5 py-1.5 flex-1"
                   style={{ border: `1px solid ${border}` }}
-                />
+                >
+                  {available.map((u) => (
+                    <option key={u.userId} value={u.userId}>
+                      {u.name} ({u.email})
+                    </option>
+                  ))}
+                </select>
+                <select
+                  name="role"
+                  defaultValue="viewer"
+                  className="text-[13px] rounded-[6px] px-2.5 py-1.5"
+                  style={{ border: `1px solid ${border}` }}
+                >
+                  <option value="viewer">Viewer</option>
+                  <option value="editor">Editor</option>
+                  <option value="owner">Owner</option>
+                </select>
                 <button
                   type="submit"
                   className="text-[13px] font-medium rounded-[6px] px-3 py-1.5"
                   style={{ background: ink, color: "#fff" }}
                 >
-                  Save
+                  Assign
                 </button>
               </form>
-              <p className="text-[11.5px] mb-3" style={{ color: sub }}>
-                Anyone with this passcode gets instant view-only access on the
-                landing page — no account needed. Clear the field to disable.
-              </p>
+            )}
+          </div>
+        );
+      })}
 
-              <div className="space-y-1.5 mb-3">
-                {members.length === 0 && (
-                  <p className="text-[13px]" style={{ color: sub }}>
-                    No one is assigned to this project yet.
-                  </p>
-                )}
-                {members.map((m) => (
-                  <div
-                    key={m.userId}
-                    className="flex items-center justify-between px-4 py-2.5 rounded-[8px]"
-                    style={{ border: `1px solid ${border}` }}
-                  >
-                    <span className="text-[13.5px]">
-                      <span className="font-medium">{m.name}</span>{" "}
-                      <span style={{ color: sub }}>{m.email}</span>{" "}
-                      <span
-                        className="ml-1 text-[10.5px] font-medium px-1.5 py-[1px] rounded-full"
-                        style={{ border: `1px solid ${border}`, color: sub }}
-                      >
-                        {m.role}
-                      </span>
-                      {isGuestEmail(m.email) && (
-                        <span
-                          className="ml-1 text-[10.5px] font-medium px-1.5 py-[1px] rounded-full"
-                          style={{ border: `1px solid ${border}`, color: sub }}
-                        >
-                          via passcode
-                        </span>
-                      )}
-                    </span>
-                    <form action={removeMemberAction}>
-                      <input type="hidden" name="projectId" value={project.id} />
-                      <input type="hidden" name="userId" value={m.userId} />
-                      <button type="submit" className="text-[12px]" style={{ color: danger }}>
-                        Remove
-                      </button>
-                    </form>
-                  </div>
-                ))}
-              </div>
-
-              {available.length > 0 && (
-                <form
-                  action={assignMemberAction}
-                  className="flex items-center gap-2 rounded-[8px] p-3"
-                  style={{ background: hoverBg }}
-                >
-                  <input type="hidden" name="projectId" value={project.id} />
-                  <select
-                    name="userId"
-                    required
-                    className="text-[13px] rounded-[6px] px-2.5 py-1.5 flex-1"
-                    style={{ border: `1px solid ${border}` }}
-                  >
-                    {available.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name} ({u.email})
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    name="role"
-                    defaultValue="viewer"
-                    className="text-[13px] rounded-[6px] px-2.5 py-1.5"
-                    style={{ border: `1px solid ${border}` }}
-                  >
-                    <option value="viewer">Viewer</option>
-                    <option value="editor">Editor</option>
-                    <option value="owner">Owner</option>
-                  </select>
+      {/* Recycle bin */}
+      {archived.length > 0 && (
+        <div>
+          <h3 className="text-[14px] font-semibold mb-3">Recycle bin ({archived.length})</h3>
+          <div className="space-y-1.5">
+            {archived.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center justify-between px-4 py-2.5 rounded-[8px]"
+                style={{ border: `1px solid ${border}` }}
+              >
+                <span className="text-[13.5px] font-medium">{p.name}</span>
+                <form action={restoreProjectAction}>
+                  <input type="hidden" name="projectId" value={p.id} />
                   <button
                     type="submit"
-                    className="text-[13px] font-medium rounded-[6px] px-3 py-1.5"
-                    style={{ background: ink, color: "#fff" }}
+                    className="text-[12px] font-medium"
+                    style={{ color: sub }}
                   >
-                    Assign
+                    Restore
                   </button>
                 </form>
-              )}
-            </div>
-          );
-        })}
-      </section>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

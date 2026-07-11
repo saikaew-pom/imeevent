@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
-import { createProject, setProjectEventDate } from "@/lib/auth/queries";
+import { createProject, setProjectEventDate, getPrimaryCompanyId } from "@/lib/auth/queries";
 import { setProjectState } from "@/lib/builder/projectState";
 import { createTasksBulk, BulkTaskInput } from "@/lib/builder/tasks";
 import { getEventPreset, offsetToDate } from "@/data/eventPresets";
@@ -66,7 +66,12 @@ export async function createProjectFromTemplateAction(formData: FormData) {
     if (v != null && String(v).trim()) answers[q.id] = String(v).trim();
   }
 
-  const project = await createProject({ name, ownerId: user.id });
+  // Every user is a member of exactly one company (admin-invite-only signup
+  // always assigns one) — a new self-serve project always belongs there.
+  const companyId = await getPrimaryCompanyId(user.id);
+  if (!companyId) throw new Error("Your account isn't assigned to a company yet — ask an admin.");
+
+  const project = await createProject({ name, ownerId: user.id, companyId });
 
   const baseSetup = generateProjectSetup(template, eventDate || "2026-01-01", {
     venue,
