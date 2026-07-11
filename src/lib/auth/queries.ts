@@ -107,6 +107,20 @@ export async function getProjectBySlug(slug: string): Promise<ProjectRow | null>
     .first<ProjectRow>();
 }
 
+// Resolve a project purely from its guest passcode, so the public landing
+// page can offer a code-only entry that never reveals which projects exist.
+export async function getProjectByPasscode(passcode: string): Promise<ProjectRow | null> {
+  const trimmed = passcode.trim();
+  if (!trimmed) return null;
+  const db = await getDB();
+  return db
+    .prepare(
+      "SELECT id, slug, name, passcode, event_date as eventDate FROM projects WHERE passcode = ? LIMIT 1"
+    )
+    .bind(trimmed)
+    .first<ProjectRow>();
+}
+
 // Creates a project from a display name and makes the creator its owner.
 // Derives a unique slug from the name (appending -2, -3, … on collision).
 export async function createProject(input: {

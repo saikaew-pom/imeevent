@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ink, sub, border, hoverBg, danger } from "@/lib/notionTheme";
+import { ink, sub, border, danger } from "@/lib/notionTheme";
 
 function LockIcon({ size = 16 }: { size?: number }) {
   return (
@@ -22,120 +22,62 @@ function LockIcon({ size = 16 }: { size?: number }) {
   );
 }
 
-function ArrowIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M9 6l6 6-6 6" />
-    </svg>
-  );
-}
-
-export function ProjectPasscodeCard({
-  slug,
-  name,
-  subtitle,
-  dashboardHref,
-}: {
-  slug: string;
-  name: string;
-  subtitle: string;
-  dashboardHref: string;
-}) {
+// A public, project-agnostic passcode entry: the code alone resolves the
+// project server-side, so no project name is ever exposed on the landing page.
+export function PasscodeEntry({ variant = "outline" }: { variant?: "outline" | "link" }) {
   const [open, setOpen] = useState(false);
+
+  const trigger =
+    variant === "link" ? (
+      <button
+        onClick={() => setOpen(true)}
+        className="text-[14px] font-medium underline underline-offset-2"
+        style={{ color: sub }}
+      >
+        Have a passcode?
+      </button>
+    ) : (
+      <button
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-2 text-[14px] font-medium px-4 py-2.5 rounded-[8px]"
+        style={{ border: `1px solid ${border}`, color: ink }}
+      >
+        <LockIcon size={15} />
+        Enter a passcode
+      </button>
+    );
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="w-full text-left flex items-center gap-3.5 px-4 py-3.5 rounded-[8px] transition-colors group"
-        style={{ border: `1px solid ${border}` }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = hoverBg)}
-        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-      >
-        <span
-          className="w-9 h-9 rounded-[7px] flex items-center justify-center shrink-0"
-          style={{ background: hoverBg, color: sub }}
-        >
-          <LockIcon />
-        </span>
-        <span className="flex-1 min-w-0">
-          <span className="flex items-center gap-2 flex-wrap">
-            <span className="text-[14.5px] font-semibold" style={{ color: ink }}>
-              {name}
-            </span>
-            <span
-              className="text-[11px] font-medium px-1.5 py-[1px] rounded-full"
-              style={{ border: `1px solid ${border}`, color: sub }}
-            >
-              Private
-            </span>
-          </span>
-          <span className="block text-[12.5px] mt-0.5" style={{ color: sub }}>
-            {subtitle}
-          </span>
-        </span>
-        <span
-          className="text-[13px] font-medium flex items-center gap-1 shrink-0"
-          style={{ color: ink }}
-        >
-          Enter passcode
-          <ArrowIcon />
-        </span>
-      </button>
-
-      {open && (
-        <PasscodeModal
-          slug={slug}
-          name={name}
-          dashboardHref={dashboardHref}
-          onClose={() => setOpen(false)}
-        />
-      )}
+      {trigger}
+      {open && <PasscodeModal onClose={() => setOpen(false)} />}
     </>
   );
 }
 
-function PasscodeModal({
-  slug,
-  name,
-  dashboardHref,
-  onClose,
-}: {
-  slug: string;
-  name: string;
-  dashboardHref: string;
-  onClose: () => void;
-}) {
+function PasscodeModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const submit = async () => {
+    if (!value.trim()) return;
     setError("");
     setLoading(true);
     try {
       const res = await fetch("/api/auth/guest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, passcode: value }),
+        body: JSON.stringify({ passcode: value }),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error ?? "Something went wrong.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.slug) {
+        setError(data.error ?? "Incorrect passcode.");
         setLoading(false);
         return;
       }
-      router.push(dashboardHref);
+      router.push(`/p/${data.slug}/dashboard`);
       router.refresh();
     } catch {
       setError("Network error — try again.");
@@ -165,9 +107,9 @@ function PasscodeModal({
         >
           <LockIcon />
         </div>
-        <h3 className="text-[16px] font-semibold mb-1">{name}</h3>
+        <h3 className="text-[16px] font-semibold mb-1">Enter your passcode</h3>
         <p className="text-[13px] mb-5" style={{ color: sub }}>
-          Enter the passcode for instant, view-only access.
+          Instant, view-only access to the deck you were invited to.
         </p>
         <input
           type="password"
