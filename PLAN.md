@@ -156,4 +156,6 @@ made without asking, stated here for the record):
 - [x] L5: nav link to `/library`
 - [x] L6: this file updated
 - [x] L7: verified locally — added one media/act/vendor item, copied each into a test project (correct table/CostLine, correct cost-group mapping), confirmed independence (editing the library item didn't touch the project's copy), confirmed a non-admin member can browse/copy but gets 403 on add, confirmed JW untouched. All test data cleaned up by exact id.
-- [ ] L8: commit + apply migration to production D1 + deploy + verify in production
+- [x] L8: committed + migration applied to production D1 + deployed + verified in production
+
+**Shipped:** commit `80aea61`, migration `0013_company_library.sql` applied to production D1, deployed (Version ID `974cdf9d-ff56-4874-bc41-a5520fef15ca`). JW's live guest-passcode dashboard confirmed unaffected post-deploy.
