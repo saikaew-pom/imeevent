@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Act,
@@ -12,6 +12,7 @@ import {
   NewActInput,
   allActsList,
 } from "@/data/acts";
+import { LibraryAct } from "@/data/companyLibrary";
 import { useDeck } from "@/store/useDeck";
 import { EnergyDots } from "@/components/EnergyBadge";
 import { moneyShort } from "@/lib/format";
@@ -32,6 +33,8 @@ export function ActLibrary() {
   const addCustomAct = useDeck((s) => s.addCustomAct);
   const updateCustomAct = useDeck((s) => s.updateCustomAct);
   const removeCustomAct = useDeck((s) => s.removeCustomAct);
+  const fetchLibraryActs = useDeck((s) => s.fetchLibraryActs);
+  const copyLibraryAct = useDeck((s) => s.copyLibraryAct);
   const canWrite = myRole === "owner" || myRole === "editor";
   const PROJECT_SLUG = useProjectSlug();
 
@@ -42,6 +45,7 @@ export function ActLibrary() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Act | null>(null);
   const [viewing, setViewing] = useState<Act | null>(null);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const [error, setError] = useState("");
 
   const isJW = PROJECT_SLUG === "jw-gala-garden-night";
@@ -105,15 +109,23 @@ export function ActLibrary() {
           ))}
         </div>
         {canWrite && (
-          <button
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-            className="btn btn-emerald py-1.5 px-3 text-[12.5px]"
-          >
-            + Add new item
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setLibraryOpen(true)}
+              className="btn py-1.5 px-3 text-[12.5px]"
+            >
+              Browse company library
+            </button>
+            <button
+              onClick={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+              className="btn btn-emerald py-1.5 px-3 text-[12.5px]"
+            >
+              + Add new item
+            </button>
+          </div>
         )}
       </div>
 
@@ -200,6 +212,14 @@ export function ActLibrary() {
       )}
 
       {viewing && <ActPhotoModal act={viewing} onClose={() => setViewing(null)} />}
+
+      {libraryOpen && (
+        <BrowseLibraryActsModal
+          onClose={() => setLibraryOpen(false)}
+          onFetch={() => fetchLibraryActs(PROJECT_SLUG)}
+          onCopy={(id) => copyLibraryAct(PROJECT_SLUG, id)}
+        />
+      )}
     </div>
   );
 }
@@ -369,6 +389,140 @@ function ActPhotoModal({ act, onClose }: { act: Act; onClose: () => void }) {
             {act.description || "No description yet."}
           </p>
         </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function BrowseLibraryActsModal({
+  onClose,
+  onFetch,
+  onCopy,
+}: {
+  onClose: () => void;
+  onFetch: () => Promise<{ ok: boolean; items?: LibraryAct[]; error?: string }>;
+  onCopy: (id: string) => Promise<{ ok: boolean; error?: string }>;
+}) {
+  const [items, setItems] = useState<LibraryAct[] | null>(null);
+  const [error, setError] = useState("");
+  const [copyingId, setCopyingId] = useState<string | null>(null);
+  const [copiedIds, setCopiedIds] = useState<Set<string>>(new Set());
+  const currency = useDeck((s) => s.financials.currency ?? "THB");
+
+  useEffect(() => {
+    let cancelled = false;
+    onFetch().then((result) => {
+      if (cancelled) return;
+      if (result.ok) setItems(result.items ?? []);
+      else setError(result.error ?? "Failed to load company library.");
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleCopy = async (id: string) => {
+    setCopyingId(id);
+    setError("");
+    const result = await onCopy(id);
+    setCopyingId(null);
+    if (result.ok) setCopiedIds((s) => new Set(s).add(id));
+    else setError(result.error ?? "Copy failed.");
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[85] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.6)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-4xl max-h-[85vh] overflow-y-auto panel px-6 py-6 fade-up"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold gold-text">Browse company library</h3>
+            <p className="text-[12px] text-[var(--text-faint)] mt-0.5">
+              Copy a show or decor item from your company&apos;s shared library into this
+              project.
+            </p>
+          </div>
+          <button onClick={onClose} className="btn px-3 py-1.5">
+            ✕
+          </button>
+        </div>
+
+        {error && (
+          <p className="text-[12.5px] mb-3" style={{ color: "var(--danger)" }}>
+            {error}
+          </p>
+        )}
+
+        {items === null ? (
+          <p className="text-[13px] text-[var(--text-faint)] py-8 text-center">Loading…</p>
+        ) : items.length === 0 ? (
+          <p className="text-[13px] text-[var(--text-faint)] py-8 text-center">
+            Nothing in your company library yet. Add items from the{" "}
+            <a href="/library" className="emerald-text hover:underline">
+              Library
+            </a>{" "}
+            page.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
+            {items.map((item) => (
+              <div key={item.id} className="panel-2 overflow-hidden flex flex-col">
+                <div className="relative h-28 overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.photo}
+                    alt={item.name}
+                    loading="lazy"
+                    className="w-full h-full object-cover"
+                  />
+                  {item.kind === "decor" && (
+                    <span
+                      className="absolute top-1.5 right-1.5 chip py-0.5 px-1.5"
+                      style={{ fontSize: 9 }}
+                    >
+                      decor
+                    </span>
+                  )}
+                </div>
+                <div className="px-2.5 py-2 flex-1 flex flex-col gap-1.5">
+                  <div className="text-[12px] font-semibold leading-tight truncate">
+                    {item.name}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-[var(--text-faint)] truncate">
+                      {item.type}
+                    </span>
+                    {item.kind === "show" && item.energy !== undefined && (
+                      <EnergyDots energy={item.energy} />
+                    )}
+                  </div>
+                  <span className="text-[10px] text-[var(--text-faint)]">
+                    {moneyShort(item.costTHB, currency)} · {item.durationMin}m
+                  </span>
+                  <button
+                    onClick={() => handleCopy(item.id)}
+                    disabled={copyingId === item.id || copiedIds.has(item.id)}
+                    className="btn btn-emerald w-full mt-auto py-1 text-[11px] disabled:opacity-60"
+                  >
+                    {copiedIds.has(item.id)
+                      ? "✓ Copied"
+                      : copyingId === item.id
+                      ? "Copying…"
+                      : "Copy to project"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>,
     document.body

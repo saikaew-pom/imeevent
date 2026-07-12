@@ -21,6 +21,7 @@ import { ProjectDocument, NewDocumentInput, SuggestedTask } from "@/data/documen
 import { MediaAsset } from "@/data/media";
 import { Talent, NewTalentInput } from "@/data/talent";
 import { EventTheme } from "@/data/theme";
+import { LibraryMediaItem, LibraryAct } from "@/data/companyLibrary";
 
 export interface LineupItem {
   uid: string;
@@ -136,6 +137,16 @@ interface DeckState {
   ) => Promise<{ ok: boolean; error?: string }>;
   removeCustomAct: (slug: string, id: string) => Promise<{ ok: boolean; error?: string }>;
 
+  // Company Library "reverse picker" for acts — same shape as the media
+  // pair above (fetch on demand, copy appends into customActs in place).
+  fetchLibraryActs: (
+    slug: string
+  ) => Promise<{ ok: boolean; items?: LibraryAct[]; error?: string }>;
+  copyLibraryAct: (
+    slug: string,
+    itemId: string
+  ) => Promise<{ ok: boolean; act?: Act; error?: string }>;
+
   // Lineup/program/financials, likewise D1-backed now. hydrateSharedState
   // fetches the saved copy (if any) and remembers the slug so every
   // mutating action below can push its own debounced update.
@@ -225,6 +236,21 @@ interface DeckState {
     slug: string,
     query: string
   ) => Promise<{ ok: boolean; ids?: string[]; error?: string }>;
+
+  // Company Library "reverse picker" — browse the current project's own
+  // company library and copy an item straight in, without leaving this page
+  // or picking a target project (unlike the standalone /library page, we
+  // already know which project we're in). Fetched on demand (not hydrated
+  // alongside mediaAssets) since it's only needed while the browse modal is
+  // open; a successful copy appends the new asset to mediaAssets in place,
+  // same as addMediaLink/uploadMediaAsset.
+  fetchLibraryMedia: (
+    slug: string
+  ) => Promise<{ ok: boolean; items?: LibraryMediaItem[]; error?: string }>;
+  copyLibraryMedia: (
+    slug: string,
+    itemId: string
+  ) => Promise<{ ok: boolean; asset?: MediaAsset; error?: string }>;
 
   // Beat-level media: gallery items, the featured key visual, and unlimited
   // pasted reference-video links. All go through updateProgramBeat so they
@@ -504,6 +530,34 @@ export const useDeck = create<DeckState>()(
             return { ok: true, act: data.act };
           } catch (e) {
             return { ok: false, error: e instanceof Error ? e.message : "Failed to add item." };
+          }
+        },
+
+        fetchLibraryActs: async (slug) => {
+          try {
+            const data = await apiJson<{ items: LibraryAct[] }>(
+              `/api/builder/library/acts?slug=${encodeURIComponent(slug)}`
+            );
+            return { ok: true, items: data.items };
+          } catch (e) {
+            return {
+              ok: false,
+              error: e instanceof Error ? e.message : "Failed to load company library.",
+            };
+          }
+        },
+
+        copyLibraryAct: async (slug, itemId) => {
+          try {
+            const data = await apiJson<{ act: Act }>(`/api/builder/library/acts/${itemId}/copy`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug }),
+            });
+            set((s) => ({ customActs: [...s.customActs, data.act] }));
+            return { ok: true, act: data.act };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Copy failed." };
           }
         },
 
@@ -1105,6 +1159,37 @@ export const useDeck = create<DeckState>()(
             return { ok: true, asset: data.asset };
           } catch (e) {
             return { ok: false, error: e instanceof Error ? e.message : "Failed to add link." };
+          }
+        },
+
+        fetchLibraryMedia: async (slug) => {
+          try {
+            const data = await apiJson<{ items: LibraryMediaItem[] }>(
+              `/api/builder/library/media?slug=${encodeURIComponent(slug)}`
+            );
+            return { ok: true, items: data.items };
+          } catch (e) {
+            return {
+              ok: false,
+              error: e instanceof Error ? e.message : "Failed to load company library.",
+            };
+          }
+        },
+
+        copyLibraryMedia: async (slug, itemId) => {
+          try {
+            const data = await apiJson<{ asset: MediaAsset }>(
+              `/api/builder/library/media/${itemId}/copy`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ slug }),
+              }
+            );
+            set((s) => ({ mediaAssets: [data.asset, ...s.mediaAssets] }));
+            return { ok: true, asset: data.asset };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Copy failed." };
           }
         },
 

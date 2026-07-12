@@ -7,7 +7,9 @@ import {
   listCompanies,
   getProjectById,
   isProjectMember,
+  Role,
 } from "@/lib/auth/queries";
+import { getProjectAccess } from "@/lib/builder/access";
 
 export interface LibraryAccess {
   user: SessionUser;
@@ -52,4 +54,31 @@ export async function assertCanCopyToProject(
   if (role !== "owner" && role !== "editor") {
     throw new Error("You need editor access on that project to copy items into it.");
   }
+}
+
+export interface ProjectLibraryAccess {
+  companyId: string;
+  projectId: string;
+  userId: string;
+  role: Role;
+}
+
+// Resolves the Company Library that a project's OWN pages (Media Library,
+// Show & Decor Builder) should browse from — the reverse of
+// getLibraryAccess() above, which resolves from the CALLER's own company.
+// This resolves from the PROJECT being viewed instead, so a company admin
+// or super admin working on a project outside their own primary company
+// still sees that project's actual library, not their own. A project with
+// no company (JW's, or any project never assigned to one) has no library to
+// browse — returns null, same as "not allowed", so callers can treat
+// "unavailable" and "unauthorized" the same way (hide the entry point).
+export async function getProjectLibraryAccess(slug: string): Promise<ProjectLibraryAccess | null> {
+  const access = await getProjectAccess(slug);
+  if (!access || !access.project.companyId) return null;
+  return {
+    companyId: access.project.companyId,
+    projectId: access.project.id,
+    userId: access.user.id,
+    role: access.role,
+  };
 }

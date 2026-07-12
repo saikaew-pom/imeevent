@@ -290,3 +290,55 @@ CSS-variable inheritance then carries to every page and component for free.
 - [x] ~~R6: code review (found & fixed the aiTheme crash-safety gap above), commit + deploy + verify in production~~
 
 **Shipped:** commit `0725794`, no migration needed, deployed (Version ID `b6b7bd6d-9587-481e-bded-0f021d308c18`). JW's live guest-passcode dashboard and Event Flow page confirmed byte-identical post-deploy (computed `--bg` matches the fixed default on both `<body>` and the project wrapper div, no console errors); `/projects` account surface unaffected.
+
+## Phase K — Company Library "reverse picker"
+
+Phase I/J's own plan explicitly deferred this: picking a library item from
+*inside* the existing Media Library / Show & Decor Builder pages (a second
+entry point), rather than only via the standalone `/library` page's own
+project-picker-then-copy flow. Scoped to exactly the two pages the original
+plan named — media and acts. Vendors stay `/library`-only; there's no
+project-scoped "vendor builder" page for a reverse entry point to live in,
+and vendor items already flow into Costing as `CostLine`s through the
+existing page.
+
+- **No new DB schema, no new copy logic.** Reuses `copyLibraryMediaToProject`/
+  `copyLibraryActToProject`/`listLibraryMedia`/`listLibraryActs` from
+  `companyLibrary.ts` untouched — this phase is purely a new, correctly-scoped
+  access path plus two small UI entry points on top of already-shipped Phase
+  I/J primitives.
+- **`getProjectLibraryAccess(slug)`** (`src/lib/builder/libraryAccess.ts`) —
+  the reverse of `getLibraryAccess()`: resolves the company from the PROJECT
+  being viewed (via `getProjectAccess(slug).project.companyId`), not from the
+  caller's own primary company. Matters for a company admin or super admin
+  working on a project outside their own default company — they now see that
+  project's actual library, not their own. Returns `null` (treated as
+  unauthorized) for a project with no company assigned.
+- **Four new routes** under `/api/builder/library/` (`media`, `media/[id]/copy`,
+  `acts`, `acts/[id]/copy`), each a thin wrapper: resolve access, check
+  `canWrite` before any copy, call the existing query-layer function.
+- **Store**: four new `useDeck` actions (`fetchLibraryMedia`/`copyLibraryMedia`,
+  `fetchLibraryActs`/`copyLibraryAct`) mirroring the existing
+  `searchMediaAssetsAI`/`addMediaLink`/`addCustomAct` shape — fetch-on-demand
+  (not hydrated into long-lived state), copy appends into `mediaAssets`/
+  `customActs` in place, same as every existing add-item action.
+- **UI**: a "Browse company library" button on the Media Library page (next to
+  Add link/Upload) and in `ActLibrary.tsx` (next to + Add new item), each
+  opening a portal modal matching the existing `AddLinkModal`/`ItemFormModal`
+  chrome, with per-item "Copying…"/"✓ Copied" state.
+- **Real bug found by code review, not by local testing**: the two new GET
+  (browse) routes checked project membership but not write-role, unlike the
+  copy routes. A project's `project_members` includes anonymous
+  guest-passcode viewers (a genuine DB-backed row, `role: "viewer"`, per the
+  existing guest-access feature) — so a passcode scoped to one client's event
+  could browse the whole company's cross-project shared library, including
+  content tied to a different client's project. Confirmed live against the
+  real dev DB (bug reproduced with the fix reverted, closed with it restored).
+  Fixed by adding the same `canWrite` gate the copy routes already had — the
+  UI already hid the button for non-writers, so this closes only a
+  direct-fetch bypass, with no behavior change for owner/editor users.
+
+- [x] ~~K1: server layer — `getProjectLibraryAccess` + GET/POST routes for media+acts~~
+- [x] ~~K2: Media Library UI — browse company library modal~~
+- [x] ~~K3: Show & Decor Builder UI — browse company library modal~~
+- [x] ~~K4: verified locally (real browse+copy for both media and acts, fresh independent ids confirmed via DB, viewer-role 403 confirmed both UI-hidden and via direct-fetch bypass, test data cleaned up) — code review found & fixed the guest cross-project library-browsing gap above~~

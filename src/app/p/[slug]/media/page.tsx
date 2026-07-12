@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDeck } from "@/store/useDeck";
 import { MediaAsset, MediaAssetKind, VIDEO_PLACEHOLDER_POSTER } from "@/data/media";
+import { LibraryMediaItem } from "@/data/companyLibrary";
 import { useProjectSlug } from "@/components/ProjectProvider";
 
 const kindLabels: Record<MediaAssetKind | "all", string> = {
@@ -22,6 +23,8 @@ export default function MediaLibraryPage() {
   const removeMediaAsset = useDeck((s) => s.removeMediaAsset);
   const addMediaLink = useDeck((s) => s.addMediaLink);
   const searchMediaAssetsAI = useDeck((s) => s.searchMediaAssetsAI);
+  const fetchLibraryMedia = useDeck((s) => s.fetchLibraryMedia);
+  const copyLibraryMedia = useDeck((s) => s.copyLibraryMedia);
   const canWrite = myRole === "owner" || myRole === "editor";
   const PROJECT_SLUG = useProjectSlug();
 
@@ -32,6 +35,7 @@ export default function MediaLibraryPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [addLinkOpen, setAddLinkOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   const [query, setQuery] = useState("");
   const [aiMatchIds, setAiMatchIds] = useState<Set<string> | null>(null);
@@ -106,6 +110,12 @@ export default function MediaLibraryPage() {
         </div>
         {canWrite && (
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setLibraryOpen(true)}
+              className="btn py-1.5 px-3 text-[12.5px]"
+            >
+              Browse company library
+            </button>
             <button
               onClick={() => setAddLinkOpen(true)}
               className="btn py-1.5 px-3 text-[12.5px]"
@@ -300,6 +310,14 @@ export default function MediaLibraryPage() {
           onAdd={async (url, name) => addMediaLink(PROJECT_SLUG, url, name)}
         />
       )}
+
+      {libraryOpen && (
+        <BrowseLibraryModal
+          onClose={() => setLibraryOpen(false)}
+          onFetch={() => fetchLibraryMedia(PROJECT_SLUG)}
+          onCopy={(id) => copyLibraryMedia(PROJECT_SLUG, id)}
+        />
+      )}
     </div>
   );
 }
@@ -386,6 +404,135 @@ function AddLinkModal({
             {busy ? "Adding…" : "Add link"}
           </button>
         </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function BrowseLibraryModal({
+  onClose,
+  onFetch,
+  onCopy,
+}: {
+  onClose: () => void;
+  onFetch: () => Promise<{ ok: boolean; items?: LibraryMediaItem[]; error?: string }>;
+  onCopy: (id: string) => Promise<{ ok: boolean; error?: string }>;
+}) {
+  const [items, setItems] = useState<LibraryMediaItem[] | null>(null);
+  const [error, setError] = useState("");
+  const [copyingId, setCopyingId] = useState<string | null>(null);
+  const [copiedIds, setCopiedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    onFetch().then((result) => {
+      if (cancelled) return;
+      if (result.ok) setItems(result.items ?? []);
+      else setError(result.error ?? "Failed to load company library.");
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleCopy = async (id: string) => {
+    setCopyingId(id);
+    setError("");
+    const result = await onCopy(id);
+    setCopyingId(null);
+    if (result.ok) setCopiedIds((s) => new Set(s).add(id));
+    else setError(result.error ?? "Copy failed.");
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[85] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.6)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-3xl max-h-[85vh] overflow-y-auto panel px-6 py-6 fade-up"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold gold-text">Browse company library</h3>
+            <p className="text-[12px] text-[var(--text-faint)] mt-0.5">
+              Copy an item from your company&apos;s shared media library into this project.
+            </p>
+          </div>
+          <button onClick={onClose} className="btn px-3 py-1.5">
+            ✕
+          </button>
+        </div>
+
+        {error && (
+          <p className="text-[12.5px] mb-3" style={{ color: "var(--danger)" }}>
+            {error}
+          </p>
+        )}
+
+        {items === null ? (
+          <p className="text-[13px] text-[var(--text-faint)] py-8 text-center">Loading…</p>
+        ) : items.length === 0 ? (
+          <p className="text-[13px] text-[var(--text-faint)] py-8 text-center">
+            Nothing in your company library yet. Add items from the{" "}
+            <a href="/library" className="emerald-text hover:underline">
+              Library
+            </a>{" "}
+            page.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {items.map((item) => (
+              <div key={item.id} className="panel-2 overflow-hidden">
+                {item.kind === "audio" ? (
+                  <div
+                    className="aspect-video flex items-center justify-center"
+                    style={{ background: "var(--bg-soft)" }}
+                  >
+                    <span style={{ fontSize: 22 }}>🎵</span>
+                  </div>
+                ) : item.kind === "link" ? (
+                  <div
+                    className="aspect-video flex items-center justify-center"
+                    style={{ background: "var(--bg-soft)" }}
+                  >
+                    <span style={{ fontSize: 22 }}>🔗</span>
+                  </div>
+                ) : (
+                  <div className="relative aspect-video">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={item.kind === "video" ? item.posterUrl ?? VIDEO_PLACEHOLDER_POSTER : item.url}
+                      alt={item.name}
+                      loading="lazy"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                <div className="px-2 py-2">
+                  <div className="text-[11px] font-medium truncate" title={item.name}>
+                    {item.name}
+                  </div>
+                  <button
+                    onClick={() => handleCopy(item.id)}
+                    disabled={copyingId === item.id || copiedIds.has(item.id)}
+                    className="btn btn-emerald w-full mt-1.5 py-1 text-[11px] disabled:opacity-60"
+                  >
+                    {copiedIds.has(item.id)
+                      ? "✓ Copied"
+                      : copyingId === item.id
+                      ? "Copying…"
+                      : "Copy to project"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>,
     document.body
