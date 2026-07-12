@@ -212,3 +212,79 @@ Architecture decisions:
 **Shipped:** commit `0c209a4` (built on `344fa6a`, an earlier fix that parallelized the wizard's overlay+theme AI calls — see git log), no migration needed, deployed (Version ID `3371975e-b678-4fe1-ba67-9eedf4d8194c`). JW's live guest-passcode dashboard confirmed byte-identical post-deploy (computed CSS vars + page text both match exactly), toggle confirmed present and functional in production.
 
 **Incident during this pass, not part of the diff:** while wrapping up, found all three real production projects (`sarah-tom-wedding`, `coco-calvin-wedding`, `paris-james-wedding`) archived on production D1 with no clear record of how — unrelated to this commit's changes. Flagged to the user; they restored all three via the admin Recycle Bin UI, confirmed back to active.
+
+## Phase R — Per-project dashboard re-skin from the AI theme
+
+After shipping Phase H + the theme switcher, the user tried it, generated a
+real theme on "Coco & Calvin Wedding," and confirmed for the third time that
+what they actually want is the generated palette to change the dashboard's
+own colors, not just show as a reference swatch row. Explicitly confirmed
+this is a materially bigger, riskier undertaking than anything shipped so
+far — the dashboard's core rendering, for every project — before starting.
+
+**The scope turned out smaller than originally estimated.** Phase H's
+original framing ("~25+ components hardcode colors, would need a structural
+refactor") undersold what the theme-switcher work (Phase T) had already
+proven: the dashboard's core palette is 100% CSS-variable driven. That means
+no component refactor is needed at all — only (1) a pure function that
+derives a full color system from the AI theme's small palette, and (2)
+applying it as an inline style at one point (the project layout), which
+CSS-variable inheritance then carries to every page and component for free.
+
+- **`src/lib/dashboardTheme.ts` — `deriveDashboardVars()`.** Never trusts the
+  AI palette's raw hex values directly for background/text (any of those
+  could be too light/dark/saturated to be legible). Instead mirrors the
+  built-in dark theme's own structure: one "background hue" (from the
+  palette's most-dominant color) carries a lightness ramp for
+  bg/bg-soft/panel/panel-2/border/border-soft; an "accent hue" (whichever
+  remaining color is most hue-distant from the background) becomes
+  gold/gold-bright; the background hue is reused a second time at higher
+  saturation/lightness for emerald/emerald-bright (the built-in palette does
+  exactly this already); "text hue" comes from the lightest palette color at
+  low saturation. Background/text lightness are hard-clamped to known-safe
+  ranges — contrast is safe by construction, not by checking-and-adjusting.
+  `danger`/`warn` are deliberately never derived (semantic, not brand colors).
+  Verified against 4 hand-picked palettes (a real 5-color romantic palette,
+  a monochrome-blue edge case, an all-pastel edge case, a warm-red edge
+  case) — all produced safe, legible, coherent results.
+- **Applied in `src/app/p/[slug]/layout.tsx`**, not per-component: reads
+  `project_state.aiTheme` server-side, derives the vars if present, sets
+  them as an inline style (plus `data-project-theme=""`) on a real
+  `flex flex-col` wrapper div around NavBar+main that explicitly paints
+  `background: var(--bg)` itself, mirroring `<body>`'s own layout classes.
+  No aiTheme (JW's project, unless she opts in) = no inline style = every
+  var falls through to the fixed `:root` defaults, completely unchanged.
+  (Originally this wrapper was `display: contents` — invisible to the flex
+  layout, CSS vars still cascade through it either way. Changed after local
+  verification found it painted no background of its own, so gaps between
+  panel sections showed `<body>`'s un-themed color instead of the theme.)
+- **Light-mode precedence**: an inline style on a descendant always beats
+  whatever it would otherwise inherit, `!important` on an ancestor rule or
+  not — inheritance is only a fallback for a property an element doesn't
+  declare itself, so `!important` on `[data-theme="light"]` (which only
+  targets `<html>`) can never reach through to override the per-project
+  theme's own inline redeclaration on the wrapper div. Local verification
+  caught this as a real bug (toggling light mode kept showing the custom
+  theme). Fixed by targeting the wrapper directly: a new
+  `[data-theme="light"] [data-project-theme]` rule in `globals.css`
+  re-declares the same 14 vars `!important`, matching the div itself rather
+  than just its ancestor. Scope decision unchanged: the per-project re-skin
+  applies to the dark/default state only; toggling to light reverts to the
+  standard light dashboard palette, not a light-ified version of the custom
+  theme.
+- **Crash-safety fix from code review**: `state.aiTheme` came back from the
+  DB as an unchecked `as EventTheme` cast; a malformed row (e.g. via the
+  generic `PUT /api/builder/state` route, which validates only the state
+  key, not per-key shape) would throw inside `deriveDashboardVars` and 500
+  every route under that project — there's no `error.tsx` boundary to
+  contain it. Fixed by routing it through the existing `sanitizeEventTheme`
+  validator (already used by both real write paths) before deriving vars;
+  confirmed byte-identical output for valid themes, `null`-safe fallback
+  for malformed ones.
+
+- [x] ~~R1: `deriveDashboardVars()` — hue/lightness/saturation derivation, hard-clamped contrast~~
+- [x] ~~R2: applied in `ProjectLayout` via inline style on the project wrapper div~~
+- [x] ~~R3: `data-project-theme` + a descendant-targeted `!important` rule so light mode always wins over a per-project theme~~
+- [x] ~~R4: this file updated~~
+- [x] ~~R5: verified locally — JW byte-identical, themed project recolors dashboard+flow, light-mode precedence (bug found & fixed), dark-mode restores theme, test data cleaned up~~
+- [x] ~~R6: code review (found & fixed the aiTheme crash-safety gap above), commit + deploy + verify in production~~

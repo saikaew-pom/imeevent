@@ -1,7 +1,8 @@
 // An AI-generated visual theme concept for an event — a name, a short mood
-// description, and a suggested color palette. Purely informational content
-// shown in Event Settings and the dashboard hero; it never recolors the
-// app's own UI chrome (that stays the fixed emerald/gold look everywhere).
+// description, and a suggested color palette. Shown as-is in Event Settings;
+// a project's dashboard also derives its actual rendered colors from this
+// palette (see src/lib/dashboardTheme.ts) when one has been generated —
+// a project with none keeps the fixed emerald/gold look everywhere.
 export interface ThemeColor {
   label: string; // e.g. "Blush Pink"
   hex: string; // e.g. "#F4C2C2"

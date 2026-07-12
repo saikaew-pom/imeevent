@@ -64,6 +64,33 @@
   --tint-med: rgba(0, 0, 0, 0.045);
 }
 
+/* A project with a generated AI theme sets these same 14 vars inline on its
+   [slug] layout's wrapper div (see src/lib/dashboardTheme.ts) — a plain
+   (non-!important) declaration on that div itself, which always wins over
+   whatever it would otherwise inherit from <html>, !important or not:
+   inheritance is only a fallback for properties an element doesn't declare
+   itself. So making light mode win over a per-project theme requires a rule
+   that matches the wrapper div DIRECTLY (via data-project-theme, set
+   unconditionally by that layout) and re-declares the same 14 vars
+   !important — an !important rule on <html> alone can never reach through
+   to override a descendant's own explicit redeclaration of the property. */
+[data-theme="light"] [data-project-theme] {
+  --bg: #faf8f3 !important;
+  --bg-rgb: 250, 248, 243 !important;
+  --bg-soft: #ffffff !important;
+  --panel: #ffffff !important;
+  --panel-2: #f3efe6 !important;
+  --border: #e2ddd0 !important;
+  --border-soft: #ece7da !important;
+  --gold: #b8923f !important;
+  --gold-bright: #96742c !important;
+  --emerald: #1f9d6b !important;
+  --emerald-bright: #167a53 !important;
+  --text: #1c2420 !important;
+  --text-dim: #4c5a53 !important;
+  --text-faint: #7c8a83 !important;
+}
+
 [data-theme="dark"] {
   --acct-bg: #14201b;
   --acct-ink: #eef3ef;
