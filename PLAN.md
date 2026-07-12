@@ -288,3 +288,5 @@ CSS-variable inheritance then carries to every page and component for free.
 - [x] ~~R4: this file updated~~
 - [x] ~~R5: verified locally — JW byte-identical, themed project recolors dashboard+flow, light-mode precedence (bug found & fixed), dark-mode restores theme, test data cleaned up~~
 - [x] ~~R6: code review (found & fixed the aiTheme crash-safety gap above), commit + deploy + verify in production~~
+
+**Shipped:** commit `0725794`, no migration needed, deployed (Version ID `b6b7bd6d-9587-481e-bded-0f021d308c18`). JW's live guest-passcode dashboard and Event Flow page confirmed byte-identical post-deploy (computed `--bg` matches the fixed default on both `<body>` and the project wrapper div, no console errors); `/projects` account surface unaffected.
