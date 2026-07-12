@@ -32,10 +32,10 @@
 
   /* Account surface (light by default) */
   --acct-bg: #ffffff;
-  --acct-ink: #37352f;
-  --acct-sub: #787774;
-  --acct-border: rgba(55, 53, 47, 0.12);
-  --acct-hover-bg: rgba(55, 53, 47, 0.04);
+  --acct-ink: #000000;
+  --acct-sub: #6b6b6b;
+  --acct-border: rgba(0, 0, 0, 0.12);
+  --acct-hover-bg: rgba(0, 0, 0, 0.04);
   --acct-danger: #e03e3e;
   /* Fixed near-black CTA fill, intentionally the same in both modes — a
      solid dark button with white text reads fine on either a light or dark
@@ -92,11 +92,11 @@
 }
 
 [data-theme="dark"] {
-  --acct-bg: #14201b;
-  --acct-ink: #eef3ef;
-  --acct-sub: #9fb3a8;
-  --acct-border: rgba(238, 243, 239, 0.14);
-  --acct-hover-bg: rgba(238, 243, 239, 0.05);
+  --acct-bg: #000000;
+  --acct-ink: #ffffff;
+  --acct-sub: #a3a3a3;
+  --acct-border: rgba(255, 255, 255, 0.14);
+  --acct-hover-bg: rgba(255, 255, 255, 0.05);
   --acct-danger: #e06a5a;
 }
 
