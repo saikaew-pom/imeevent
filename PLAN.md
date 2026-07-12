@@ -206,5 +206,9 @@ Architecture decisions:
 - [x] ~~T3: fixed remaining hardcoded `#ffffff` page backgrounds (`bg` export) across projects/admin/login/landing/library~~
 - [x] ~~T4: `ThemeToggle` component + `beforeInteractive` pre-paint script in the root layout (no flash) + wired into `NavBar` and the projects/admin/library headers~~
 - [x] ~~T5: this file updated~~
-- [ ] T6: verify locally — JW-safety, both themes, both surfaces, persistence
-- [ ] T7: commit + deploy + verify in production
+- [x] ~~T6: verified locally — computed CSS values for all 15 dashboard vars match the original hex exactly with no stored preference; round-trips correctly; light dashboard + dark account pages both coherent and legible~~
+- [x] ~~T7: committed + deployed + verified in production~~
+
+**Shipped:** commit `0c209a4` (built on `344fa6a`, an earlier fix that parallelized the wizard's overlay+theme AI calls — see git log), no migration needed, deployed (Version ID `3371975e-b678-4fe1-ba67-9eedf4d8194c`). JW's live guest-passcode dashboard confirmed byte-identical post-deploy (computed CSS vars + page text both match exactly), toggle confirmed present and functional in production.
+
+**Incident during this pass, not part of the diff:** while wrapping up, found all three real production projects (`sarah-tom-wedding`, `coco-calvin-wedding`, `paris-james-wedding`) archived on production D1 with no clear record of how — unrelated to this commit's changes. Flagged to the user; they restored all three via the admin Recycle Bin UI, confirmed back to active.
