@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ink, sub, border, danger } from "@/lib/notionTheme";
+import { ink, sub, border, danger, bg, accentBg } from "@/lib/notionTheme";
 
 function LockIcon({ size = 16 }: { size?: number }) {
   return (
@@ -94,7 +94,7 @@ function PasscodeModal({ onClose }: { onClose: () => void }) {
       <div
         className="w-full max-w-sm rounded-[10px] px-7 py-8 text-center"
         style={{
-          background: "#ffffff",
+          background: bg,
           border: `1px solid ${border}`,
           boxShadow: "0 12px 40px rgba(0,0,0,0.18)",
           color: ink,
@@ -141,7 +141,7 @@ function PasscodeModal({ onClose }: { onClose: () => void }) {
             onClick={submit}
             disabled={loading}
             className="flex-1 py-2.5 rounded-[7px] text-[13.5px] font-medium"
-            style={{ background: ink, color: "#fff", opacity: loading ? 0.6 : 1 }}
+            style={{ background: accentBg, color: "#fff", opacity: loading ? 0.6 : 1 }}
           >
             {loading ? "Entering…" : "Enter"}
           </button>

@@ -1,7 +1,18 @@
 @import "tailwindcss";
 
+/* Theme switcher — a single `data-theme="light"|"dark"` attribute on <html>,
+   set by ThemeToggle and applied pre-paint by the inline script in the root
+   layout. Absent (no stored preference) = today's exact look on every page:
+   the dashboard's dark emerald/gold vars below and the --acct-* (account
+   surface: /projects, /admin, /library, /login, landing) vars both keep
+   their current values in this un-overridden :root block. Toggling commits
+   the WHOLE app to one consistent mode: [data-theme="light"] only needs to
+   override the dashboard vars (the account surface is already light), and
+   [data-theme="dark"] only needs to override the --acct-* vars (the
+   dashboard is already dark). */
 :root {
   --bg: #0a0f0d;
+  --bg-rgb: 10, 15, 13;
   --bg-soft: #101815;
   --panel: #14201b;
   --panel-2: #1a2a23;
@@ -16,6 +27,50 @@
   --text-faint: #6c8177;
   --danger: #e06a5a;
   --warn: #e0b24a;
+  --tint-weak: rgba(255, 255, 255, 0.02);
+  --tint-med: rgba(255, 255, 255, 0.03);
+
+  /* Account surface (light by default) */
+  --acct-bg: #ffffff;
+  --acct-ink: #37352f;
+  --acct-sub: #787774;
+  --acct-border: rgba(55, 53, 47, 0.12);
+  --acct-hover-bg: rgba(55, 53, 47, 0.04);
+  --acct-danger: #e03e3e;
+  /* Fixed near-black CTA fill, intentionally the same in both modes — a
+     solid dark button with white text reads fine on either a light or dark
+     page, so it doesn't need to flip like body text (--acct-ink) does. */
+  --acct-accent-bg: #1a1a1a;
+}
+
+[data-theme="light"] {
+  --bg: #faf8f3;
+  --bg-rgb: 250, 248, 243;
+  --bg-soft: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #f3efe6;
+  --border: #e2ddd0;
+  --border-soft: #ece7da;
+  --gold: #b8923f;
+  --gold-bright: #96742c;
+  --emerald: #1f9d6b;
+  --emerald-bright: #167a53;
+  --text: #1c2420;
+  --text-dim: #4c5a53;
+  --text-faint: #7c8a83;
+  --danger: #c94a3a;
+  --warn: #a8752f;
+  --tint-weak: rgba(0, 0, 0, 0.03);
+  --tint-med: rgba(0, 0, 0, 0.045);
+}
+
+[data-theme="dark"] {
+  --acct-bg: #14201b;
+  --acct-ink: #eef3ef;
+  --acct-sub: #9fb3a8;
+  --acct-border: rgba(238, 243, 239, 0.14);
+  --acct-hover-bg: rgba(238, 243, 239, 0.05);
+  --acct-danger: #e06a5a;
 }
 
 @theme inline {
@@ -94,7 +149,7 @@ body {
   padding: 3px 9px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--tint-weak);
   color: var(--text-dim);
   white-space: nowrap;
 }
@@ -148,7 +203,7 @@ body {
 }
 .nav-link:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--tint-med);
 }
 .nav-link.active {
   color: var(--gold-bright);

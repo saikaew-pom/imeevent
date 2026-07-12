@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ink, sub, border, danger } from "@/lib/notionTheme";
+import { ink, sub, border, danger, accentBg, bg } from "@/lib/notionTheme";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -39,13 +39,13 @@ export default function LoginPage() {
   return (
     <div
       className="min-h-screen flex items-center justify-center font-sans px-4"
-      style={{ background: "#ffffff", color: ink }}
+      style={{ background: bg, color: ink }}
     >
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-2 justify-center mb-8">
           <span
             className="inline-flex items-center justify-center rounded-[6px] w-5 h-5 text-[11px] font-bold"
-            style={{ background: ink, color: "#fff" }}
+            style={{ background: accentBg, color: "#fff" }}
           >
             E
           </span>
@@ -93,7 +93,7 @@ export default function LoginPage() {
             type="submit"
             disabled={loading}
             className="w-full py-2.5 rounded-[7px] text-[13.5px] font-medium mt-2"
-            style={{ background: ink, color: "#fff", opacity: loading ? 0.6 : 1 }}
+            style={{ background: accentBg, color: "#fff", opacity: loading ? 0.6 : 1 }}
           >
             {loading ? "Signing in…" : "Sign in"}
           </button>

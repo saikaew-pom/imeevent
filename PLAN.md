@@ -159,3 +159,52 @@ made without asking, stated here for the record):
 - [x] ~~L8: committed + migration applied to production D1 + deployed + verified in production~~
 
 **Shipped:** commit `80aea61`, migration `0013_company_library.sql` applied to production D1, deployed (Version ID `974cdf9d-ff56-4874-bc41-a5520fef15ca`). JW's live guest-passcode dashboard confirmed unaffected post-deploy.
+
+## Phase T — App-wide light/dark theme switcher
+
+The app had two separate hardcoded palettes: the gala dashboard (dark
+emerald/gold, CSS-var driven) and the account surfaces — `/projects`,
+`/admin`, `/library`, `/login`, the landing page (light "Notion" palette,
+driven by plain JS hex constants in `notionTheme.ts`, not CSS vars).
+Architecture decisions:
+
+- **One shared `data-theme` attribute on `<html>`**, three effective states:
+  absent (default — today's exact mixed look, dashboard dark + account
+  light, unchanged), `"light"` (only overrides the dashboard's vars — the
+  account surface is already light), `"dark"` (only overrides the new
+  `--acct-*` vars — the dashboard is already dark). A user never has to
+  return to "absent"; clicking the toggle always writes an explicit value.
+  This guarantees JW-safety trivially: with no stored preference, nothing
+  about her dashboard's CSS changes at all.
+- **`notionTheme.ts`'s exports became CSS var references** (`var(--acct-*)`)
+  instead of hardcoded hex — every one of the 7 files that already imported
+  `ink`/`sub`/`border`/`hoverBg`/`danger` picked up the toggle for free, with
+  zero changes to their own logic.
+- **Found and fixed a real contrast trap before it shipped**: ~20 buttons
+  across those files did `background: ink, color: "#fff"` — a solid dark
+  button with hardcoded white text. `ink` also doubles as the flipping
+  body-text color, so it must go light under dark mode — which would have
+  made every one of those buttons' white text disappear into a now-light
+  background. Introduced a separate `accentBg` token (fixed near-black,
+  intentionally the same in both modes) for solid CTA fills instead, and
+  fixed the mirror-image case (fixed-white pill + flipping `ink` text) found
+  on the landing page's dark CTA band.
+- **Left the ~30-50 scattered decorative/chart-specific hardcoded colors
+  alone** (modal scrims, `GanttChart` category hues, energy-badge colors) —
+  they already read fine in either mode (a semi-transparent black scrim
+  works as an overlay regardless of base theme; arbitrary chart legend hues
+  don't need to invert) and touching them wasn't needed for a coherent
+  light/dark app.
+- **No toggle button on `/login` or the landing page** — scope call, not a
+  gap: those pages still fully respect a stored preference (same CSS vars),
+  there just isn't a switcher control rendered on them; toggling from
+  `/projects` or the dashboard is enough to set the whole app's mode before
+  ever reaching those pages.
+
+- [x] ~~T1: CSS variable system — `[data-theme="light"]` override for the dashboard's existing vars, new `--acct-*` vars (default light) + `[data-theme="dark"]` override, fixed `.chip`/`.nav-link:hover` tint vars~~
+- [x] ~~T2: `notionTheme.ts` → CSS vars; introduced `accentBg` and fixed all ~20 `background: ink` button-fill occurrences~~
+- [x] ~~T3: fixed remaining hardcoded `#ffffff` page backgrounds (`bg` export) across projects/admin/login/landing/library~~
+- [x] ~~T4: `ThemeToggle` component + `beforeInteractive` pre-paint script in the root layout (no flash) + wired into `NavBar` and the projects/admin/library headers~~
+- [x] ~~T5: this file updated~~
+- [ ] T6: verify locally — JW-safety, both themes, both surfaces, persistence
+- [ ] T7: commit + deploy + verify in production

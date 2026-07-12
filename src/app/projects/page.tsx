@@ -3,9 +3,10 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
 import { listUserProjects } from "@/lib/auth/queries";
 import { SignOutButton } from "@/components/SignOutButton";
-import { ink, sub, border, hoverBg } from "@/lib/notionTheme";
+import { ink, sub, border, hoverBg, accentBg, bg } from "@/lib/notionTheme";
 import { createProjectFromTemplateAction, duplicateProjectAction } from "./actions";
 import { NewProjectWizard } from "@/components/projects/NewProjectWizard";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default async function ProjectsPage() {
   const user = await getSessionUser();
@@ -14,13 +15,13 @@ export default async function ProjectsPage() {
   const projects = await listUserProjects(user.id);
 
   return (
-    <div className="min-h-screen font-sans" style={{ background: "#ffffff", color: ink }}>
+    <div className="min-h-screen font-sans" style={{ background: bg, color: ink }}>
       <header style={{ borderBottom: `1px solid ${border}` }}>
         <div className="mx-auto max-w-[880px] px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span
               className="inline-flex items-center justify-center rounded-[6px] w-5 h-5 text-[11px] font-bold"
-              style={{ background: ink, color: "#fff" }}
+              style={{ background: accentBg, color: "#fff" }}
             >
               E
             </span>
@@ -35,6 +36,7 @@ export default async function ProjectsPage() {
                 Admin
               </Link>
             )}
+            <ThemeToggle className="text-[13px] hover:underline" style={{ color: sub }} />
             <SignOutButton className="text-[13px] hover:underline" style={{ color: sub }} />
           </div>
         </div>

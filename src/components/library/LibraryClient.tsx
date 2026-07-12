@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { SignOutButton } from "@/components/SignOutButton";
-import { ink, sub, border, hoverBg, danger } from "@/lib/notionTheme";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { ink, sub, border, hoverBg, danger, bg, accentBg } from "@/lib/notionTheme";
 import {
   LibraryMediaItem,
   LibraryAct,
@@ -186,7 +187,7 @@ function MediaTab({
               onClick={addLink}
               disabled={busy}
               className="text-[13px] font-medium rounded-[6px] px-4 py-2 disabled:opacity-60"
-              style={{ background: ink, color: "#fff" }}
+              style={{ background: accentBg, color: "#fff" }}
             >
               Add link
             </button>
@@ -407,7 +408,7 @@ function ActForm({
             className="text-[11px] rounded-full px-2.5 py-1"
             style={{
               border: `1px solid ${border}`,
-              background: input.themes.includes(t) ? ink : "transparent",
+              background: input.themes.includes(t) ? accentBg : "transparent",
               color: input.themes.includes(t) ? "#fff" : sub,
             }}
           >
@@ -425,7 +426,7 @@ function ActForm({
               className="text-[11px] rounded-full px-2.5 py-1"
               style={{
                 border: `1px solid ${border}`,
-                background: (input.placement ?? []).includes(p) ? ink : "transparent",
+                background: (input.placement ?? []).includes(p) ? accentBg : "transparent",
                 color: (input.placement ?? []).includes(p) ? "#fff" : sub,
               }}
             >
@@ -469,7 +470,7 @@ function ActForm({
           onClick={submit}
           disabled={saving || uploading}
           className="text-[13px] font-medium rounded-[6px] px-4 py-2 disabled:opacity-60"
-          style={{ background: ink, color: "#fff" }}
+          style={{ background: accentBg, color: "#fff" }}
         >
           {saving ? "Saving…" : initial ? "Save changes" : "Add item"}
         </button>
@@ -706,7 +707,7 @@ function VendorForm({
           onClick={submit}
           disabled={saving || uploading}
           className="text-[13px] font-medium rounded-[6px] px-4 py-2 disabled:opacity-60"
-          style={{ background: ink, color: "#fff" }}
+          style={{ background: accentBg, color: "#fff" }}
         >
           {saving ? "Saving…" : initial ? "Save changes" : "Add item"}
         </button>
@@ -845,13 +846,13 @@ export function LibraryClient({
   ];
 
   return (
-    <div className="min-h-screen font-sans" style={{ background: "#ffffff", color: ink }}>
+    <div className="min-h-screen font-sans" style={{ background: bg, color: ink }}>
       <header style={{ borderBottom: `1px solid ${border}` }}>
         <div className="mx-auto max-w-[880px] px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span
               className="inline-flex items-center justify-center rounded-[6px] w-5 h-5 text-[11px] font-bold"
-              style={{ background: ink, color: "#fff" }}
+              style={{ background: accentBg, color: "#fff" }}
             >
               E
             </span>
@@ -861,6 +862,7 @@ export function LibraryClient({
             <Link href="/projects" className="text-[13px] hover:underline" style={{ color: sub }}>
               Projects
             </Link>
+            <ThemeToggle className="text-[13px] hover:underline" style={{ color: sub }} />
             <SignOutButton className="text-[13px] hover:underline" style={{ color: sub }} />
           </div>
         </div>
@@ -883,7 +885,7 @@ export function LibraryClient({
               className="text-[13px] font-medium rounded-[6px] px-3.5 py-2"
               style={
                 tab === t.key
-                  ? { background: ink, color: "#fff" }
+                  ? { background: accentBg, color: "#fff" }
                   : { border: `1px solid ${border}`, color: sub }
               }
             >

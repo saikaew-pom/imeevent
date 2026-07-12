@@ -10,7 +10,8 @@ import {
   CompanyRow,
 } from "@/lib/auth/queries";
 import { SignOutButton } from "@/components/SignOutButton";
-import { ink, sub, border, hoverBg, danger } from "@/lib/notionTheme";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { ink, sub, border, hoverBg, danger, accentBg, bg } from "@/lib/notionTheme";
 import {
   createCompanyAction,
   renameCompanyAction,
@@ -38,13 +39,13 @@ export default async function AdminPage() {
   const companies = isSuperAdmin ? allCompanies : allCompanies.filter((c) => adminCompanyIds!.has(c.id));
 
   return (
-    <div className="min-h-screen font-sans" style={{ background: "#ffffff", color: ink }}>
+    <div className="min-h-screen font-sans" style={{ background: bg, color: ink }}>
       <header style={{ borderBottom: `1px solid ${border}` }}>
         <div className="mx-auto max-w-[880px] px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span
               className="inline-flex items-center justify-center rounded-[6px] w-5 h-5 text-[11px] font-bold"
-              style={{ background: ink, color: "#fff" }}
+              style={{ background: accentBg, color: "#fff" }}
             >
               E
             </span>
@@ -54,6 +55,7 @@ export default async function AdminPage() {
             <Link href="/projects" className="text-[13px] hover:underline" style={{ color: sub }}>
               Projects
             </Link>
+            <ThemeToggle className="text-[13px] hover:underline" style={{ color: sub }} />
             <SignOutButton className="text-[13px] hover:underline" style={{ color: sub }} />
           </div>
         </div>
@@ -79,7 +81,7 @@ export default async function AdminPage() {
               <button
                 type="submit"
                 className="text-[13.5px] font-medium rounded-[6px] px-4 py-2 shrink-0"
-                style={{ background: ink, color: "#fff" }}
+                style={{ background: accentBg, color: "#fff" }}
               >
                 Create company
               </button>
@@ -174,7 +176,7 @@ async function CompanySection({
           <button
             type="submit"
             className="text-[13.5px] font-medium rounded-[6px] px-4 py-2"
-            style={{ background: ink, color: "#fff" }}
+            style={{ background: accentBg, color: "#fff" }}
           >
             Create user
           </button>
@@ -268,7 +270,7 @@ async function CompanySection({
           <button
             type="submit"
             className="text-[13.5px] font-medium rounded-[6px] px-4 py-2 shrink-0"
-            style={{ background: ink, color: "#fff" }}
+            style={{ background: accentBg, color: "#fff" }}
           >
             Create project
           </button>
@@ -314,7 +316,7 @@ async function CompanySection({
               <button
                 type="submit"
                 className="text-[13px] font-medium rounded-[6px] px-3 py-1.5"
-                style={{ background: ink, color: "#fff" }}
+                style={{ background: accentBg, color: "#fff" }}
               >
                 Save
               </button>
@@ -396,7 +398,7 @@ async function CompanySection({
                 <button
                   type="submit"
                   className="text-[13px] font-medium rounded-[6px] px-3 py-1.5"
-                  style={{ background: ink, color: "#fff" }}
+                  style={{ background: accentBg, color: "#fff" }}
                 >
                   Assign
                 </button>

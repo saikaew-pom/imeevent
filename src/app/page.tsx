@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ink, sub, border, hoverBg } from "@/lib/notionTheme";
+import { ink, sub, border, hoverBg, accentBg, bg } from "@/lib/notionTheme";
 import { PasscodeEntry } from "@/components/PasscodeEntry";
 
 function Icon({ path, size = 17 }: { path: string; size?: number }) {
@@ -56,7 +56,7 @@ export default function LandingPage() {
   return (
     <div
       className="min-h-screen flex flex-col font-sans"
-      style={{ background: "#ffffff", color: ink }}
+      style={{ background: bg, color: ink }}
     >
       {/* Header */}
       <header style={{ borderBottom: `1px solid ${border}` }}>
@@ -64,7 +64,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-2">
             <span
               className="inline-flex items-center justify-center rounded-[6px] w-5 h-5 text-[11px] font-bold"
-              style={{ background: ink, color: "#fff" }}
+              style={{ background: accentBg, color: "#fff" }}
             >
               E
             </span>
@@ -75,7 +75,7 @@ export default function LandingPage() {
           <Link
             href="/login"
             className="text-[13px] font-medium px-3.5 py-1.5 rounded-[6px]"
-            style={{ background: ink, color: "#fff" }}
+            style={{ background: accentBg, color: "#fff" }}
           >
             Sign in
           </Link>
@@ -106,7 +106,7 @@ export default function LandingPage() {
           <Link
             href="/login"
             className="inline-flex items-center gap-1.5 text-[14px] font-semibold px-5 py-2.5 rounded-[8px]"
-            style={{ background: ink, color: "#fff" }}
+            style={{ background: accentBg, color: "#fff" }}
           >
             Sign in
             <Icon path="M9 6l6 6-6 6" size={15} />
@@ -141,7 +141,7 @@ export default function LandingPage() {
       <section className="mx-auto max-w-[960px] px-6 pb-20 w-full">
         <div
           className="rounded-[12px] px-8 py-10 md:px-12 md:py-12 text-center"
-          style={{ background: ink, color: "#fff" }}
+          style={{ background: accentBg, color: "#fff" }}
         >
           <h2 className="text-[24px] md:text-[28px] font-bold tracking-tight mb-2">
             Stop rebuilding the plan in five different tools.
@@ -154,7 +154,7 @@ export default function LandingPage() {
             <Link
               href="/login"
               className="inline-block text-[14px] font-semibold px-5 py-2.5 rounded-[8px]"
-              style={{ background: "#fff", color: ink }}
+              style={{ background: "#fff", color: accentBg }}
             >
               Sign in to your workspace
             </Link>

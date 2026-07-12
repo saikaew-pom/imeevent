@@ -15,7 +15,7 @@ import {
 import { getEventPreset } from "@/data/eventPresets";
 import { EventTheme } from "@/data/theme";
 import { CURRENCIES, CurrencyCode, money } from "@/lib/format";
-import { ink, sub, border, hoverBg } from "@/lib/notionTheme";
+import { ink, sub, border, hoverBg, accentBg } from "@/lib/notionTheme";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -547,7 +547,7 @@ export function NewProjectWizard({
                   name="intent"
                   value="use-ai"
                   className="text-[13.5px] font-medium rounded-[6px] px-4 py-2"
-                  style={{ background: ink, color: "#fff" }}
+                  style={{ background: accentBg, color: "#fff" }}
                 >
                   Use this setup
                 </button>
