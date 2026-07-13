@@ -402,3 +402,47 @@ no production D1 migration — that's a separate step when ready).
 - [x] ~~M3: per-task document attachment (0014 migration + join queries + checkbox UI; code review fixed cross-project id gap)~~
 - [x] ~~M4: regenerate/refine a preset from a brief (0015 preset_id + refine/apply routes + RefinePresetModal)~~
 - [x] ~~M5: verified all four locally end-to-end, inline code review, PLAN.md updated, committed locally (not pushed/deployed)~~
+
+## Phase N — Admin & Library usability
+
+The Company Library forms and the Admin panel were readable only to whoever
+built them. This phase makes both usable by a non-technical operator, without
+restructuring either data model. Built and verified locally; **not deployed**.
+
+- **N1 — Library form labels.** Every input in the Show & Decor, Vendors, and
+  Media add-forms now has a visible label (a module-level `LibField` wrapper —
+  module-level, not nested, so inputs don't remount and lose focus). The root
+  problem was placeholder-only fields: once a numeric field had a value the
+  placeholder vanished, leaving the notorious unlabelled "0 / 10 / 5" boxes,
+  which are now clearly **Indicative cost (THB)**, **Stage time (minutes)**,
+  and **Energy level (1 = calm, 10 = peak)**. Chip groups got headings
+  (Themes / vibe, Where in the show) and the dropdowns clearer option text.
+- **N2 — Admin labels + role legend.** An "Admin" heading + one-line purpose,
+  a collapsible "What the roles mean" legend explaining Viewer / Editor / Owner
+  / Company admin / Super admin / "via passcode" in plain language (the page's
+  jargon had no explanation anywhere), a helper line on "Add a user" describing
+  the create-login-and-share-password flow, and labels on the previously bare
+  assign-member selects ("Give [person] access as [role]").
+- **N4 — Confirmation on destructive actions.** Archive, Remove-from-company,
+  Remove-from-project, and Delete-account now go through a `ConfirmSubmitButton`
+  (a small client component so the admin page stays a server component) that
+  shows a contextual `confirm()` naming the exact target before the server
+  action fires — previously they were plain one-click submits, with "Remove"
+  and "Delete account" sitting inches apart distinguished only by colour.
+- **N5 — Passcode copy affordance.** A one-click **Copy** button next to each
+  project's guest passcode (shown only when a passcode is set). Deliberately a
+  copy button, not masking: a guest passcode is meant to be shared, so hiding it
+  would just force a reveal on every use.
+- **Verification.** Local, in-browser: library labels render on all three tabs
+  (`--text-faint` resolves on the account surface), the role legend expands, the
+  confirm gate was proven to block submission when declined (stubbed `confirm()`
+  → `formSubmitted: false`, nothing archived), and the copy button renders only
+  where a passcode exists. `tsc --noEmit` clean, no console errors. Inline code
+  review (no defects — changes are presentational + additive affordances, no
+  form/logic paths touched).
+
+- [x] ~~N1: Library form labels — ActForm / VendorForm / MediaTab via `LibField`~~
+- [x] ~~N2: Admin labels + collapsible role legend + assign-member labels~~
+- [x] ~~N4: confirmation dialogs on Archive / Remove / Delete account~~
+- [x] ~~N5: passcode Copy button~~
+- [ ] N3: collapsible admin information architecture (company/project cards + switcher) — deferred; the single long scroll still stands, pending a look at the restructure approach

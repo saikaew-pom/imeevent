@@ -167,7 +167,10 @@ function MediaTab({
     <div>
       {isAdmin && (
         <div className="rounded-[8px] p-4 mb-5" style={{ border: `1px solid ${border}` }}>
-          <div className="flex flex-wrap items-center gap-2 mb-2">
+          <span className="text-[10.5px] uppercase tracking-wide text-[var(--text-faint)]">
+            Add media to the library
+          </span>
+          <div className="flex flex-wrap items-center gap-2 mt-2 mb-2">
             <input
               value={linkUrl}
               onChange={(e) => setLinkUrl(e.target.value)}
@@ -277,6 +280,35 @@ const EMPTY_ACT_INPUT: NewActInput = {
   placement: ["mid"],
 };
 
+// Labelled-field wrapper for the library add/edit forms. Every input gets a
+// visible label instead of leaning on a placeholder that disappears the moment
+// the field has a value — the reason the numeric boxes (cost / duration /
+// energy) read as unlabelled "0 / 10 / 5". Module-level (not nested in a form
+// component) so inputs don't remount and lose focus on each keystroke.
+function LibField({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[10.5px] uppercase tracking-wide text-[var(--text-faint)]">
+        {label}
+      </span>
+      {hint ? (
+        <span className="text-[10.5px] text-[var(--text-faint)] tracking-normal">
+          {" "}· {hint}
+        </span>
+      ) : null}
+      <div className="mt-1">{children}</div>
+    </label>
+  );
+}
+
 function ActForm({
   initial,
   onSubmit,
@@ -338,101 +370,127 @@ function ActForm({
 
   return (
     <div className="rounded-[8px] p-4 mb-3" style={{ border: `1px solid ${border}` }}>
-      <div className="grid md:grid-cols-2 gap-2 mb-2">
-        <select
-          value={input.kind}
-          onChange={(e) => setInput((i) => ({ ...i, kind: e.target.value as ItemKind }))}
-          className="text-[13px] rounded-[6px] px-3 py-2"
-          style={{ border: `1px solid ${border}` }}
-        >
-          <option value="show">Show</option>
-          <option value="decor">Decor</option>
-        </select>
-        <input
-          value={input.name}
-          onChange={(e) => setInput((i) => ({ ...i, name: e.target.value }))}
-          placeholder="Name"
-          className="text-[13px] rounded-[6px] px-3 py-2"
-          style={{ border: `1px solid ${border}` }}
-        />
-        <input
-          value={input.type}
-          onChange={(e) => setInput((i) => ({ ...i, type: e.target.value }))}
-          placeholder="Type / category"
-          className="text-[13px] rounded-[6px] px-3 py-2"
-          style={{ border: `1px solid ${border}` }}
-        />
-        <input
-          type="number"
-          value={input.costTHB}
-          onChange={(e) => setInput((i) => ({ ...i, costTHB: Number(e.target.value) || 0 }))}
-          placeholder="Cost"
-          className="text-[13px] rounded-[6px] px-3 py-2"
-          style={{ border: `1px solid ${border}` }}
-        />
-        <input
-          type="number"
-          value={input.durationMin}
-          onChange={(e) => setInput((i) => ({ ...i, durationMin: Number(e.target.value) || 0 }))}
-          placeholder="Duration (min)"
-          className="text-[13px] rounded-[6px] px-3 py-2"
-          style={{ border: `1px solid ${border}` }}
-        />
-        {isShow && (
+      <div className="grid md:grid-cols-2 gap-x-2 gap-y-3 mb-3">
+        <LibField label="Item type">
+          <select
+            value={input.kind}
+            onChange={(e) => setInput((i) => ({ ...i, kind: e.target.value as ItemKind }))}
+            className="w-full text-[13px] rounded-[6px] px-3 py-2"
+            style={{ border: `1px solid ${border}` }}
+          >
+            <option value="show">Show act (performance)</option>
+            <option value="decor">Décor / installation</option>
+          </select>
+        </LibField>
+        <LibField label="Name">
           <input
-            type="number"
-            min={1}
-            max={10}
-            value={input.energy ?? 5}
-            onChange={(e) => setInput((i) => ({ ...i, energy: Number(e.target.value) || 5 }))}
-            placeholder="Energy (1-10)"
-            className="text-[13px] rounded-[6px] px-3 py-2"
+            value={input.name}
+            onChange={(e) => setInput((i) => ({ ...i, name: e.target.value }))}
+            placeholder="e.g. Aerial silk duo"
+            className="w-full text-[13px] rounded-[6px] px-3 py-2"
             style={{ border: `1px solid ${border}` }}
           />
+        </LibField>
+        <LibField label="Category / style">
+          <input
+            value={input.type}
+            onChange={(e) => setInput((i) => ({ ...i, type: e.target.value }))}
+            placeholder="e.g. Aerial, LED, Fire, Cultural"
+            className="w-full text-[13px] rounded-[6px] px-3 py-2"
+            style={{ border: `1px solid ${border}` }}
+          />
+        </LibField>
+        <LibField label="Indicative cost" hint="THB">
+          <input
+            type="number"
+            value={input.costTHB}
+            onChange={(e) => setInput((i) => ({ ...i, costTHB: Number(e.target.value) || 0 }))}
+            placeholder="0"
+            className="w-full text-[13px] rounded-[6px] px-3 py-2"
+            style={{ border: `1px solid ${border}` }}
+          />
+        </LibField>
+        <LibField label="Stage time" hint="minutes">
+          <input
+            type="number"
+            value={input.durationMin}
+            onChange={(e) => setInput((i) => ({ ...i, durationMin: Number(e.target.value) || 0 }))}
+            placeholder="10"
+            className="w-full text-[13px] rounded-[6px] px-3 py-2"
+            style={{ border: `1px solid ${border}` }}
+          />
+        </LibField>
+        {isShow && (
+          <LibField label="Energy level" hint="1 = calm, 10 = peak">
+            <input
+              type="number"
+              min={1}
+              max={10}
+              value={input.energy ?? 5}
+              onChange={(e) => setInput((i) => ({ ...i, energy: Number(e.target.value) || 5 }))}
+              placeholder="5"
+              className="w-full text-[13px] rounded-[6px] px-3 py-2"
+              style={{ border: `1px solid ${border}` }}
+            />
+          </LibField>
         )}
       </div>
-      <textarea
-        value={input.description}
-        onChange={(e) => setInput((i) => ({ ...i, description: e.target.value }))}
-        placeholder="Description"
-        rows={2}
-        className="w-full text-[13px] rounded-[6px] px-3 py-2 mb-2"
-        style={{ border: `1px solid ${border}` }}
-      />
-      <div className="flex flex-wrap gap-1.5 mb-2">
-        {THEME_OPTIONS.map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => toggleTheme(t)}
-            className="text-[11px] rounded-full px-2.5 py-1"
-            style={{
-              border: `1px solid ${border}`,
-              background: input.themes.includes(t) ? accentBg : "transparent",
-              color: input.themes.includes(t) ? "#fff" : sub,
-            }}
-          >
-            {label(t)}
-          </button>
-        ))}
+      <div className="mb-3">
+        <LibField label="Description">
+          <textarea
+            value={input.description}
+            onChange={(e) => setInput((i) => ({ ...i, description: e.target.value }))}
+            placeholder="What it is and how it reads on stage"
+            rows={2}
+            className="w-full text-[13px] rounded-[6px] px-3 py-2"
+            style={{ border: `1px solid ${border}` }}
+          />
+        </LibField>
       </div>
-      {isShow && (
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {PLACEMENT_OPTIONS.map((p) => (
+      <div className="mb-3">
+        <span className="text-[10.5px] uppercase tracking-wide text-[var(--text-faint)]">
+          Themes / vibe
+        </span>
+        <div className="flex flex-wrap gap-1.5 mt-1">
+          {THEME_OPTIONS.map((t) => (
             <button
-              key={p}
+              key={t}
               type="button"
-              onClick={() => togglePlacement(p)}
+              onClick={() => toggleTheme(t)}
               className="text-[11px] rounded-full px-2.5 py-1"
               style={{
                 border: `1px solid ${border}`,
-                background: (input.placement ?? []).includes(p) ? accentBg : "transparent",
-                color: (input.placement ?? []).includes(p) ? "#fff" : sub,
+                background: input.themes.includes(t) ? accentBg : "transparent",
+                color: input.themes.includes(t) ? "#fff" : sub,
               }}
             >
-              {label(p)}
+              {label(t)}
             </button>
           ))}
+        </div>
+      </div>
+      {isShow && (
+        <div className="mb-3">
+          <span className="text-[10.5px] uppercase tracking-wide text-[var(--text-faint)]">
+            Where in the show
+          </span>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {PLACEMENT_OPTIONS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => togglePlacement(p)}
+                className="text-[11px] rounded-full px-2.5 py-1"
+                style={{
+                  border: `1px solid ${border}`,
+                  background: (input.placement ?? []).includes(p) ? accentBg : "transparent",
+                  color: (input.placement ?? []).includes(p) ? "#fff" : sub,
+                }}
+              >
+                {label(p)}
+              </button>
+            ))}
+          </div>
         </div>
       )}
       <div className="flex items-center gap-3 mb-3">
@@ -631,57 +689,73 @@ function VendorForm({
 
   return (
     <div className="rounded-[8px] p-4 mb-3" style={{ border: `1px solid ${border}` }}>
-      <div className="grid md:grid-cols-2 gap-2 mb-2">
-        <select
-          value={input.category}
-          onChange={(e) => setInput((i) => ({ ...i, category: e.target.value as VendorCategory }))}
-          className="text-[13px] rounded-[6px] px-3 py-2"
-          style={{ border: `1px solid ${border}` }}
-        >
-          {VENDOR_CATEGORIES.map((c) => (
-            <option key={c.key} value={c.key}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-        <input
-          value={input.name}
-          onChange={(e) => setInput((i) => ({ ...i, name: e.target.value }))}
-          placeholder="Name"
-          className="text-[13px] rounded-[6px] px-3 py-2"
-          style={{ border: `1px solid ${border}` }}
-        />
-        <input
-          type="number"
-          value={input.costTHB}
-          onChange={(e) => setInput((i) => ({ ...i, costTHB: Number(e.target.value) || 0 }))}
-          placeholder="Cost"
-          className="text-[13px] rounded-[6px] px-3 py-2"
-          style={{ border: `1px solid ${border}` }}
-        />
-        <input
-          value={input.unit}
-          onChange={(e) => setInput((i) => ({ ...i, unit: e.target.value }))}
-          placeholder='Unit, e.g. "per day"'
-          className="text-[13px] rounded-[6px] px-3 py-2"
-          style={{ border: `1px solid ${border}` }}
-        />
-        <input
-          value={input.vendorContact}
-          onChange={(e) => setInput((i) => ({ ...i, vendorContact: e.target.value }))}
-          placeholder="Vendor contact"
-          className="text-[13px] rounded-[6px] px-3 py-2 md:col-span-2"
-          style={{ border: `1px solid ${border}` }}
-        />
+      <div className="grid md:grid-cols-2 gap-x-2 gap-y-3 mb-3">
+        <LibField label="Vendor category">
+          <select
+            value={input.category}
+            onChange={(e) => setInput((i) => ({ ...i, category: e.target.value as VendorCategory }))}
+            className="w-full text-[13px] rounded-[6px] px-3 py-2"
+            style={{ border: `1px solid ${border}` }}
+          >
+            {VENDOR_CATEGORIES.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </LibField>
+        <LibField label="Name">
+          <input
+            value={input.name}
+            onChange={(e) => setInput((i) => ({ ...i, name: e.target.value }))}
+            placeholder="e.g. Bright Stage AV"
+            className="w-full text-[13px] rounded-[6px] px-3 py-2"
+            style={{ border: `1px solid ${border}` }}
+          />
+        </LibField>
+        <LibField label="Cost" hint="THB per unit">
+          <input
+            type="number"
+            value={input.costTHB}
+            onChange={(e) => setInput((i) => ({ ...i, costTHB: Number(e.target.value) || 0 }))}
+            placeholder="0"
+            className="w-full text-[13px] rounded-[6px] px-3 py-2"
+            style={{ border: `1px solid ${border}` }}
+          />
+        </LibField>
+        <LibField label="Priced per" hint="the unit above">
+          <input
+            value={input.unit}
+            onChange={(e) => setInput((i) => ({ ...i, unit: e.target.value }))}
+            placeholder='e.g. "per day", "per trip", "per person"'
+            className="w-full text-[13px] rounded-[6px] px-3 py-2"
+            style={{ border: `1px solid ${border}` }}
+          />
+        </LibField>
+        <div className="md:col-span-2">
+          <LibField label="Vendor contact" hint="name, phone or email">
+            <input
+              value={input.vendorContact}
+              onChange={(e) => setInput((i) => ({ ...i, vendorContact: e.target.value }))}
+              placeholder="e.g. Khun Nok · 08x-xxx-xxxx"
+              className="w-full text-[13px] rounded-[6px] px-3 py-2"
+              style={{ border: `1px solid ${border}` }}
+            />
+          </LibField>
+        </div>
       </div>
-      <textarea
-        value={input.description}
-        onChange={(e) => setInput((i) => ({ ...i, description: e.target.value }))}
-        placeholder="Description"
-        rows={2}
-        className="w-full text-[13px] rounded-[6px] px-3 py-2 mb-2"
-        style={{ border: `1px solid ${border}` }}
-      />
+      <div className="mb-3">
+        <LibField label="Description">
+          <textarea
+            value={input.description}
+            onChange={(e) => setInput((i) => ({ ...i, description: e.target.value }))}
+            placeholder="What they supply and any notes"
+            rows={2}
+            className="w-full text-[13px] rounded-[6px] px-3 py-2"
+            style={{ border: `1px solid ${border}` }}
+          />
+        </LibField>
+      </div>
       <label className="text-[12px] cursor-pointer" style={{ color: sub }}>
         {uploading ? "Uploading…" : input.photo ? "Change photo" : "Upload photo (optional)"}
         <input

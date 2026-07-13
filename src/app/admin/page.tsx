@@ -11,6 +11,8 @@ import {
 } from "@/lib/auth/queries";
 import { SignOutButton } from "@/components/SignOutButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
+import { CopyButton } from "@/components/CopyButton";
 import { ink, sub, border, hoverBg, danger, accentBg, bg } from "@/lib/notionTheme";
 import {
   createCompanyAction,
@@ -62,6 +64,42 @@ export default async function AdminPage() {
       </header>
 
       <section className="mx-auto max-w-[880px] px-6 py-12 space-y-16">
+        <div>
+          <h1 className="text-[22px] font-semibold mb-1">Admin</h1>
+          <p className="text-[13px] mb-4" style={{ color: sub }}>
+            Manage companies, people, and who can see each project.
+          </p>
+          <details className="rounded-[8px] p-4" style={{ border: `1px solid ${border}` }}>
+            <summary className="text-[13px] font-medium cursor-pointer">
+              What the roles mean
+            </summary>
+            <ul className="mt-3 space-y-1.5 text-[12.5px]" style={{ color: sub }}>
+              <li>
+                <b style={{ color: ink }}>Viewer</b> — can open a project and look, but not
+                change anything.
+              </li>
+              <li>
+                <b style={{ color: ink }}>Editor</b> — can open a project and edit its plan.
+              </li>
+              <li>
+                <b style={{ color: ink }}>Owner</b> — full control of that one project.
+              </li>
+              <li>
+                <b style={{ color: ink }}>Company admin</b> — can manage every project, person,
+                and setting inside their company (this page).
+              </li>
+              <li>
+                <b style={{ color: ink }}>Super admin</b> — can do all of the above across every
+                company on the platform.
+              </li>
+              <li>
+                <b style={{ color: ink }}>via passcode</b> — a guest who got in with a project&apos;s
+                shared passcode, not a real account.
+              </li>
+            </ul>
+          </details>
+        </div>
+
         {isSuperAdmin && (
           <div>
             <h2 className="text-[16px] font-semibold mb-3">Create a company</h2>
@@ -142,7 +180,12 @@ async function CompanySection({
 
       {/* Add a user */}
       <div>
-        <h3 className="text-[14px] font-semibold mb-3">Add a user</h3>
+        <h3 className="text-[14px] font-semibold mb-1">Add a user</h3>
+        <p className="text-[12px] mb-3" style={{ color: sub }}>
+          Creates a login for a teammate. They can sign in right away with the email and
+          password you set here — share those with them. Leave both boxes below unticked for a
+          normal member.
+        </p>
         <form
           action={createUserInCompanyAction}
           className="grid md:grid-cols-4 gap-2 items-start rounded-[8px] p-4"
@@ -232,16 +275,24 @@ async function CompanySection({
                 <form action={removeCompanyMemberAction}>
                   <input type="hidden" name="companyId" value={company.id} />
                   <input type="hidden" name="userId" value={u.userId} />
-                  <button type="submit" className="text-[12px]" style={{ color: sub }}>
-                    Remove
-                  </button>
+                  <ConfirmSubmitButton
+                    message={`Remove ${u.name} from ${company.name}? They keep their account but lose access to this company's projects.`}
+                    className="text-[12px]"
+                    style={{ color: sub }}
+                  >
+                    Remove from company
+                  </ConfirmSubmitButton>
                 </form>
                 {isSuperAdmin && (
                   <form action={deleteUserAction}>
                     <input type="hidden" name="userId" value={u.userId} />
-                    <button type="submit" className="text-[12px]" style={{ color: danger }}>
+                    <ConfirmSubmitButton
+                      message={`Permanently delete ${u.name}'s account (${u.email})? This cannot be undone.`}
+                      className="text-[12px]"
+                      style={{ color: danger }}
+                    >
                       Delete account
-                    </button>
+                    </ConfirmSubmitButton>
                   </form>
                 )}
               </div>
@@ -290,9 +341,13 @@ async function CompanySection({
               <h3 className="text-[14px] font-semibold">Project: {project.name}</h3>
               <form action={archiveProjectAction}>
                 <input type="hidden" name="projectId" value={project.id} />
-                <button type="submit" className="text-[12px]" style={{ color: danger }}>
+                <ConfirmSubmitButton
+                  message={`Archive "${project.name}"? It moves to the recycle bin below and everyone loses access until it's restored.`}
+                  className="text-[12px]"
+                  style={{ color: danger }}
+                >
                   Archive
-                </button>
+                </ConfirmSubmitButton>
               </form>
             </div>
 
@@ -313,6 +368,13 @@ async function CompanySection({
                 className="text-[13px] rounded-[6px] px-2.5 py-1.5 flex-1"
                 style={{ border: `1px solid ${border}` }}
               />
+              {project.passcode && (
+                <CopyButton
+                  value={project.passcode}
+                  className="text-[13px] font-medium rounded-[6px] px-3 py-1.5 shrink-0"
+                  style={{ border: `1px solid ${border}`, color: sub }}
+                />
+              )}
               <button
                 type="submit"
                 className="text-[13px] font-medium rounded-[6px] px-3 py-1.5"
@@ -358,9 +420,13 @@ async function CompanySection({
                   <form action={removeMemberAction}>
                     <input type="hidden" name="projectId" value={project.id} />
                     <input type="hidden" name="userId" value={m.userId} />
-                    <button type="submit" className="text-[12px]" style={{ color: danger }}>
+                    <ConfirmSubmitButton
+                      message={`Remove ${m.name} from "${project.name}"? They'll lose access to this project.`}
+                      className="text-[12px]"
+                      style={{ color: danger }}
+                    >
                       Remove
-                    </button>
+                    </ConfirmSubmitButton>
                   </form>
                 </div>
               ))}
@@ -373,9 +439,13 @@ async function CompanySection({
                 style={{ background: hoverBg }}
               >
                 <input type="hidden" name="projectId" value={project.id} />
+                <span className="text-[12.5px] shrink-0" style={{ color: sub }}>
+                  Give
+                </span>
                 <select
                   name="userId"
                   required
+                  aria-label="Person to give access to"
                   className="text-[13px] rounded-[6px] px-2.5 py-1.5 flex-1"
                   style={{ border: `1px solid ${border}` }}
                 >
@@ -385,9 +455,13 @@ async function CompanySection({
                     </option>
                   ))}
                 </select>
+                <span className="text-[12.5px] shrink-0" style={{ color: sub }}>
+                  access as
+                </span>
                 <select
                   name="role"
                   defaultValue="viewer"
+                  aria-label="Access level"
                   className="text-[13px] rounded-[6px] px-2.5 py-1.5"
                   style={{ border: `1px solid ${border}` }}
                 >
