@@ -128,7 +128,12 @@ export default async function AdminPage() {
         )}
 
         {companies.map((company) => (
-          <CompanySection key={company.id} company={company} isSuperAdmin={isSuperAdmin} />
+          <CompanySection
+            key={company.id}
+            company={company}
+            isSuperAdmin={isSuperAdmin}
+            defaultOpen={companies.length === 1}
+          />
         ))}
       </section>
     </div>
@@ -138,9 +143,11 @@ export default async function AdminPage() {
 async function CompanySection({
   company,
   isSuperAdmin,
+  defaultOpen,
 }: {
   company: CompanyRow;
   isSuperAdmin: boolean;
+  defaultOpen: boolean;
 }) {
   const [companyUsers, projects, allProjects] = await Promise.all([
     listCompanyUsers(company.id),
@@ -154,29 +161,41 @@ async function CompanySection({
   );
 
   return (
-    <div className="space-y-10 pb-16" style={{ borderBottom: `1px solid ${border}` }}>
-      <div>
-        <p className="text-[11px] font-medium tracking-wide uppercase mb-1.5" style={{ color: sub }}>
+    <details open={defaultOpen} className="pb-8" style={{ borderBottom: `1px solid ${border}` }}>
+      <summary className="cursor-pointer select-none flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-8">
+        <span className="text-[11px] font-medium tracking-wide uppercase" style={{ color: sub }}>
           Company
-        </p>
-        <h2 className="text-[20px] font-semibold mb-3">{company.name}</h2>
-        <form action={renameCompanyAction} className="flex items-center gap-2">
-          <input type="hidden" name="companyId" value={company.id} />
-          <input
-            name="name"
-            defaultValue={company.name}
-            className="text-[13px] rounded-[6px] px-2.5 py-1.5"
-            style={{ border: `1px solid ${border}` }}
-          />
-          <button
-            type="submit"
-            className="text-[12px] font-medium rounded-[6px] px-3 py-1.5"
-            style={{ border: `1px solid ${border}`, color: sub }}
-          >
-            Rename
-          </button>
-        </form>
-      </div>
+        </span>
+        <span className="text-[19px] font-semibold">{company.name}</span>
+        <span className="text-[12px]" style={{ color: sub }}>
+          {realUsers.length} {realUsers.length === 1 ? "user" : "users"} · {projects.length}{" "}
+          {projects.length === 1 ? "project" : "projects"}
+          {archived.length > 0 ? ` · ${archived.length} archived` : ""}
+        </span>
+      </summary>
+      <div className="space-y-10">
+        {/* Rename company */}
+        <div>
+          <p className="text-[11px] font-medium tracking-wide uppercase mb-1.5" style={{ color: sub }}>
+            Rename company
+          </p>
+          <form action={renameCompanyAction} className="flex items-center gap-2">
+            <input type="hidden" name="companyId" value={company.id} />
+            <input
+              name="name"
+              defaultValue={company.name}
+              className="text-[13px] rounded-[6px] px-2.5 py-1.5"
+              style={{ border: `1px solid ${border}` }}
+            />
+            <button
+              type="submit"
+              className="text-[12px] font-medium rounded-[6px] px-3 py-1.5"
+              style={{ border: `1px solid ${border}`, color: sub }}
+            >
+              Rename
+            </button>
+          </form>
+        </div>
 
       {/* Add a user */}
       <div>
@@ -336,20 +355,31 @@ async function CompanySection({
         const memberIds = new Set(members.map((m) => m.userId));
         const available = realUsers.filter((u) => !memberIds.has(u.userId));
         return (
-          <div key={project.id}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-[14px] font-semibold">Project: {project.name}</h3>
-              <form action={archiveProjectAction}>
-                <input type="hidden" name="projectId" value={project.id} />
-                <ConfirmSubmitButton
-                  message={`Archive "${project.name}"? It moves to the recycle bin below and everyone loses access until it's restored.`}
-                  className="text-[12px]"
-                  style={{ color: danger }}
-                >
-                  Archive
-                </ConfirmSubmitButton>
-              </form>
-            </div>
+          <details
+            key={project.id}
+            className="rounded-[8px]"
+            style={{ border: `1px solid ${border}` }}
+          >
+            <summary className="cursor-pointer select-none flex items-center justify-between gap-3 px-4 py-2.5">
+              <span className="text-[13.5px] font-semibold">{project.name}</span>
+              <span className="text-[12px] shrink-0" style={{ color: sub }}>
+                {members.length} {members.length === 1 ? "member" : "members"}
+                {project.passcode ? " · passcode set" : ""}
+              </span>
+            </summary>
+            <div className="px-4 pb-4 pt-1 space-y-3">
+              <div className="flex justify-end">
+                <form action={archiveProjectAction}>
+                  <input type="hidden" name="projectId" value={project.id} />
+                  <ConfirmSubmitButton
+                    message={`Archive "${project.name}"? It moves to the recycle bin below and everyone loses access until it's restored.`}
+                    className="text-[12px]"
+                    style={{ color: danger }}
+                  >
+                    Archive
+                  </ConfirmSubmitButton>
+                </form>
+              </div>
 
             {/* Passcode */}
             <form
@@ -478,7 +508,8 @@ async function CompanySection({
                 </button>
               </form>
             )}
-          </div>
+            </div>
+          </details>
         );
       })}
 
@@ -509,7 +540,8 @@ async function CompanySection({
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </details>
   );
 }
 

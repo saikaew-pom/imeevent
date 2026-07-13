@@ -445,4 +445,4 @@ restructuring either data model. Built and verified locally; **not deployed**.
 - [x] ~~N2: Admin labels + collapsible role legend + assign-member labels~~
 - [x] ~~N4: confirmation dialogs on Archive / Remove / Delete account~~
 - [x] ~~N5: passcode Copy button~~
-- [ ] N3: collapsible admin information architecture (company/project cards + switcher) — deferred; the single long scroll still stands, pending a look at the restructure approach
+- [x] ~~N3: collapsible admin information architecture — each company and each project is now a native `<details>` (server-component-safe, no client JS): companies auto-open only when there's a single one, project cards collapse by default with a summary line (name · N members · passcode status), Archive moved into the card body (forms can't live in a `<summary>`). Turns the endless single scroll into a scannable, expandable tree. Verified: correct open/closed defaults and summaries, expanded card still holds archive/passcode/copy/members/assign~~
