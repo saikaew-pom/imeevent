@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDeck } from "@/store/useDeck";
 import {
   ProjectTask,
@@ -15,7 +15,10 @@ import { GanttChart } from "@/components/timeline/GanttChart";
 import { PresetPickerModal } from "@/components/timeline/PresetPickerModal";
 import { AddDocumentModal } from "@/components/timeline/AddDocumentModal";
 import { SuggestionsModal } from "@/components/timeline/SuggestionsModal";
+import { TimelineReviewModal } from "@/components/timeline/TimelineReviewModal";
+import { RefinePresetModal } from "@/components/timeline/RefinePresetModal";
 import { SuggestedTask } from "@/data/documents";
+import { ImportedPreset } from "@/data/eventPresets";
 import { useProjectSlug } from "@/components/ProjectProvider";
 
 const ALL_CATEGORIES = Object.keys(CATEGORY_LABELS) as TaskCategory[];
@@ -40,6 +43,9 @@ export default function TimelinePage() {
   const removeDocument = useDeck((s) => s.removeDocument);
   const suggestTasks = useDeck((s) => s.suggestTasks);
   const acceptSuggestions = useDeck((s) => s.acceptSuggestions);
+  const listImportedPresets = useDeck((s) => s.listImportedPresets);
+  const refinePresetTasks = useDeck((s) => s.refinePresetTasks);
+  const applyRefinedPreset = useDeck((s) => s.applyRefinedPreset);
   const canWrite = myRole === "owner" || myRole === "editor";
   const PROJECT_SLUG = useProjectSlug();
 
@@ -51,7 +57,23 @@ export default function TimelinePage() {
   const [suggesting, setSuggesting] = useState(false);
   const [suggestions, setSuggestions] = useState<SuggestedTask[] | null>(null);
   const [editing, setEditing] = useState<ProjectTask | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [refineOpen, setRefineOpen] = useState(false);
+  const [importedPresets, setImportedPresets] = useState<ImportedPreset[]>([]);
   const [error, setError] = useState("");
+
+  // Which presets have been imported into this project — drives the gated
+  // "Refine a preset" control. Re-fetch whenever the task set changes (import,
+  // refine, or manual deletes can add/remove a preset from the list).
+  useEffect(() => {
+    let live = true;
+    listImportedPresets(PROJECT_SLUG).then((r) => {
+      if (live && r.ok) setImportedPresets(r.presets ?? []);
+    });
+    return () => {
+      live = false;
+    };
+  }, [PROJECT_SLUG, tasks, listImportedPresets]);
 
   const runSuggest = async () => {
     setError("");
@@ -152,11 +174,25 @@ export default function TimelinePage() {
           {canWrite && (
             <>
               <button
+                onClick={() => setReviewOpen(true)}
+                className="btn py-1.5 px-3 text-[12.5px]"
+              >
+                ✨ AI Review
+              </button>
+              <button
                 onClick={() => setPresetOpen(true)}
                 className="btn py-1.5 px-3 text-[12.5px]"
               >
                 ✨ Use a preset
               </button>
+              {importedPresets.length > 0 && (
+                <button
+                  onClick={() => setRefineOpen(true)}
+                  className="btn py-1.5 px-3 text-[12.5px]"
+                >
+                  ✨ Refine a preset
+                </button>
+              )}
               <button
                 onClick={() => {
                   setEditing(null);
@@ -209,8 +245,8 @@ export default function TimelinePage() {
         </div>
         {documents.length === 0 ? (
           <p className="text-[12px] text-[var(--text-faint)]">
-            Attach contracts, quotes or briefs (PDF, image, or pasted text). The AI reads
-            them and suggests tasks for your timeline.
+            Attach contracts, quotes or briefs (PDF, Word doc, image, or pasted text). The AI
+            reads them and suggests tasks for your timeline.
           </p>
         ) : (
           <div className="flex flex-wrap gap-2">
@@ -219,7 +255,9 @@ export default function TimelinePage() {
                 key={d.id}
                 className="panel-2 flex items-center gap-2 pl-2.5 pr-1.5 py-1.5 text-[12px]"
               >
-                <span>{d.kind === "pdf" ? "📄" : d.kind === "image" ? "🖼️" : "📝"}</span>
+                <span>
+                  {d.kind === "pdf" ? "📄" : d.kind === "docx" ? "📃" : d.kind === "image" ? "🖼️" : "📝"}
+                </span>
                 {d.fileKey ? (
                   <a
                     href={`/api/builder/photo/${d.fileKey}`}
@@ -329,6 +367,7 @@ export default function TimelinePage() {
         <TaskFormModal
           initial={editing ?? undefined}
           members={members}
+          documents={documents}
           onClose={() => {
             setFormOpen(false);
             setEditing(null);
@@ -358,6 +397,32 @@ export default function TimelinePage() {
           suggestions={suggestions}
           onClose={() => setSuggestions(null)}
           onAccept={(accepted) => acceptSuggestions(PROJECT_SLUG, accepted)}
+        />
+      )}
+
+      {reviewOpen && (
+        <TimelineReviewModal
+          onClose={() => setReviewOpen(false)}
+          onJumpToTask={(taskId) => {
+            const task = tasks.find((t) => t.id === taskId);
+            if (!task) return;
+            setReviewOpen(false);
+            setEditing(task);
+            setFormOpen(true);
+          }}
+        />
+      )}
+
+      {refineOpen && (
+        <RefinePresetModal
+          presets={importedPresets}
+          onClose={() => setRefineOpen(false)}
+          onPropose={(presetId, brief) =>
+            refinePresetTasks(PROJECT_SLUG, presetId, brief)
+          }
+          onApply={(presetId, accepted) =>
+            applyRefinedPreset(PROJECT_SLUG, presetId, accepted)
+          }
         />
       )}
     </div>

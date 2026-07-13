@@ -24,6 +24,16 @@ export interface EventPreset {
   tasks: TaskTemplate[];
 }
 
+// A preset that has actually been imported into a project, with how many tasks
+// it currently contributes. Returned by GET /api/builder/tasks/presets and used
+// by the Timeline's "Refine a preset" control.
+export interface ImportedPreset {
+  id: string;
+  name: string;
+  icon: string;
+  count: number;
+}
+
 // Compute an ISO date (YYYY-MM-DD) from the event date and a day offset.
 // Parsed as UTC to avoid off-by-one timezone drift.
 export function offsetToDate(eventDate: string, offset: number | null): string | null {

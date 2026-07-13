@@ -8,10 +8,18 @@ export function SuggestionsModal({
   suggestions,
   onClose,
   onAccept,
+  title = "AI-suggested tasks",
+  subtitle = "From your documents. Untick anything you don't want, then add the rest.",
+  acceptLabel = (n) => `Add ${n} task${n === 1 ? "" : "s"}`,
+  emptyText = "The AI didn't find any new tasks in your documents.",
 }: {
   suggestions: SuggestedTask[];
   onClose: () => void;
   onAccept: (accepted: SuggestedTask[]) => Promise<{ ok: boolean; added: number }>;
+  title?: string;
+  subtitle?: string;
+  acceptLabel?: (count: number) => string;
+  emptyText?: string;
 }) {
   const [checked, setChecked] = useState<boolean[]>(suggestions.map(() => true));
   const [adding, setAdding] = useState(false);
@@ -41,18 +49,16 @@ export function SuggestionsModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-1">
-          <h3 className="text-lg font-semibold gold-text">AI-suggested tasks</h3>
+          <h3 className="text-lg font-semibold gold-text">{title}</h3>
           <button onClick={onClose} className="btn px-3 py-1.5">
             ✕
           </button>
         </div>
-        <p className="text-[12.5px] text-[var(--text-dim)] mb-4">
-          From your documents. Untick anything you don&apos;t want, then add the rest.
-        </p>
+        <p className="text-[12.5px] text-[var(--text-dim)] mb-4">{subtitle}</p>
 
         {suggestions.length === 0 ? (
           <p className="text-[13px] text-[var(--text-faint)] py-6 text-center">
-            The AI didn&apos;t find any new tasks in your documents.
+            {emptyText}
           </p>
         ) : (
           <div className="space-y-2 mb-5">
@@ -100,7 +106,7 @@ export function SuggestionsModal({
               disabled={adding || selectedCount === 0}
               className="btn btn-gold px-4 py-2 disabled:opacity-60"
             >
-              {adding ? "Adding…" : `Add ${selectedCount} task${selectedCount === 1 ? "" : "s"}`}
+              {adding ? "Adding…" : acceptLabel(selectedCount)}
             </button>
           )}
         </div>

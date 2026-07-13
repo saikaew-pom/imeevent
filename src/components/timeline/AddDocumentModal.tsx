@@ -3,9 +3,12 @@
 import { useState } from "react";
 import { NewDocumentInput } from "@/data/documents";
 import { extractPdfText } from "@/lib/pdf";
+import { extractDocxText } from "@/lib/docx";
 import { useProjectSlug } from "@/components/ProjectProvider";
 
 type Mode = "file" | "text";
+
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 export function AddDocumentModal({
   onClose,
@@ -44,6 +47,18 @@ export function AddDocumentModal({
           mime: file.type,
         });
         setStatus(`PDF ready — ${text.length.toLocaleString()} characters of text.`);
+      } else if (file.type === DOCX_MIME) {
+        setStatus("Reading Word document…");
+        const text = await extractDocxText(file);
+        const key = await uploadFile(file);
+        setPending({
+          name: name || file.name.replace(/\.[^.]+$/, ""),
+          kind: "docx",
+          fileKey: key,
+          textContent: text,
+          mime: file.type,
+        });
+        setStatus(`Document ready — ${text.length.toLocaleString()} characters of text.`);
       } else if (file.type.startsWith("image/")) {
         setStatus("Uploading image…");
         const key = await uploadFile(file);
@@ -56,7 +71,7 @@ export function AddDocumentModal({
         });
         setStatus("Image ready — the AI will read it directly.");
       } else {
-        setError("Only PDF or image files are supported.");
+        setError("Only PDF, Word (.docx), or image files are supported.");
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not process the file.");
@@ -133,7 +148,7 @@ export function AddDocumentModal({
                   : {}
               }
             >
-              {m === "file" ? "Upload PDF / image" : "Paste text"}
+              {m === "file" ? "Upload file" : "Paste text"}
             </button>
           ))}
         </div>
@@ -154,10 +169,10 @@ export function AddDocumentModal({
         {mode === "file" ? (
           <div>
             <label className="btn px-3 py-2 text-[12.5px] cursor-pointer inline-block">
-              {busy ? "Working…" : pending ? "Choose a different file" : "Choose PDF or image"}
+              {busy ? "Working…" : pending ? "Choose a different file" : "Choose a file"}
               <input
                 type="file"
-                accept="application/pdf,image/jpeg,image/png,image/webp,image/gif"
+                accept={`application/pdf,${DOCX_MIME},image/jpeg,image/png,image/webp,image/gif`}
                 className="hidden"
                 disabled={busy}
                 onChange={(e) => {

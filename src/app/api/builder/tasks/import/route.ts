@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     sortOrder: i,
   }));
 
-  const tasks = await createTasksBulk(access.project.id, access.user.id, rows);
+  const tasks = await createTasksBulk(access.project.id, access.user.id, rows, preset.id);
   await setProjectEventDate(access.project.id, eventDate);
 
   return NextResponse.json({ tasks, eventDate });

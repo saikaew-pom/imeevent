@@ -10,6 +10,7 @@ import {
   CATEGORY_LABELS,
   STATUS_LABELS,
 } from "@/data/tasks";
+import { ProjectDocument } from "@/data/documents";
 
 const ALL_CATEGORIES = Object.keys(CATEGORY_LABELS) as TaskCategory[];
 const ALL_STATUSES = Object.keys(STATUS_LABELS) as TaskStatus[];
@@ -17,11 +18,13 @@ const ALL_STATUSES = Object.keys(STATUS_LABELS) as TaskStatus[];
 export function TaskFormModal({
   initial,
   members,
+  documents,
   onClose,
   onSubmit,
 }: {
   initial?: ProjectTask;
   members: ProjectMember[];
+  documents: ProjectDocument[];
   onClose: () => void;
   onSubmit: (input: NewTaskInput) => Promise<{ ok: boolean; error?: string }>;
 }) {
@@ -32,9 +35,16 @@ export function TaskFormModal({
   const [startDate, setStartDate] = useState(initial?.startDate ?? "");
   const [dueDate, setDueDate] = useState(initial?.dueDate ?? "");
   const [assigneeId, setAssigneeId] = useState(initial?.assigneeId ?? "");
+  const [documentIds, setDocumentIds] = useState<string[]>(initial?.documentIds ?? []);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const toggleDocument = (id: string) => {
+    setDocumentIds((prev) =>
+      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
+    );
+  };
 
   const submit = async () => {
     if (!title.trim()) return;
@@ -48,6 +58,7 @@ export function TaskFormModal({
       startDate: startDate || null,
       dueDate: dueDate || null,
       assigneeId: assigneeId || null,
+      documentIds,
     });
     setSaving(false);
     if (result.ok) onClose();
@@ -162,6 +173,33 @@ export function TaskFormModal({
                 </option>
               ))}
             </select>
+          </Field>
+
+          <Field label="Attached documents">
+            {documents.length === 0 ? (
+              <p className="text-[12px] text-[var(--text-faint)]">
+                No documents in this project yet — add one from the Documents panel.
+              </p>
+            ) : (
+              <div
+                className="space-y-1 max-h-32 overflow-y-auto panel-2 p-2"
+                style={{ borderRadius: 8 }}
+              >
+                {documents.map((d) => (
+                  <label
+                    key={d.id}
+                    className="flex items-center gap-2 text-[12.5px] cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={documentIds.includes(d.id)}
+                      onChange={() => toggleDocument(d.id)}
+                    />
+                    {d.name}
+                  </label>
+                ))}
+              </div>
+            )}
           </Field>
         </div>
 

@@ -16,7 +16,8 @@ import {
   EMPTY_EVENT_META,
 } from "@/data/runOfShow";
 import { Slide } from "@/data/slides";
-import { ProjectTask, NewTaskInput, ProjectMember } from "@/data/tasks";
+import { ProjectTask, NewTaskInput, ProjectMember, TimelineFinding } from "@/data/tasks";
+import { ImportedPreset } from "@/data/eventPresets";
 import { ProjectDocument, NewDocumentInput, SuggestedTask } from "@/data/documents";
 import { MediaAsset } from "@/data/media";
 import { Talent, NewTalentInput } from "@/data/talent";
@@ -217,6 +218,21 @@ interface DeckState {
     suggestions: SuggestedTask[]
   ) => Promise<{ ok: boolean; added: number }>;
 
+  // Refine an imported preset from a free-text brief (M4).
+  listImportedPresets: (
+    slug: string
+  ) => Promise<{ ok: boolean; presets?: ImportedPreset[]; error?: string }>;
+  refinePresetTasks: (
+    slug: string,
+    presetId: string,
+    brief: string
+  ) => Promise<{ ok: boolean; suggestions?: SuggestedTask[]; error?: string }>;
+  applyRefinedPreset: (
+    slug: string,
+    presetId: string,
+    tasks: SuggestedTask[]
+  ) => Promise<{ ok: boolean; added?: number; error?: string }>;
+
   // Master media library — reusable uploaded photos/clips, project-scoped.
   hydrateMediaAssets: (slug: string) => Promise<void>;
   uploadMediaAsset: (
@@ -285,6 +301,12 @@ interface DeckState {
   reviewRunOfShow: (
     slug: string
   ) => Promise<{ ok: boolean; findings?: ReviewFinding[]; error?: string }>;
+
+  // Same shape as reviewRunOfShow, but for the Timeline's prep tasks instead
+  // of Event Flow's run-of-show program.
+  reviewTimeline: (
+    slug: string
+  ) => Promise<{ ok: boolean; findings?: TimelineFinding[]; error?: string }>;
 }
 
 export const useDeck = create<DeckState>()(
@@ -1028,6 +1050,52 @@ export const useDeck = create<DeckState>()(
           return { ok: added > 0, added };
         },
 
+        listImportedPresets: async (slug) => {
+          try {
+            const data = await apiJson<{ presets: ImportedPreset[] }>(
+              `/api/builder/tasks/presets?slug=${encodeURIComponent(slug)}`
+            );
+            return { ok: true, presets: data.presets };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Failed to load presets." };
+          }
+        },
+
+        refinePresetTasks: async (slug, presetId, brief) => {
+          try {
+            const data = await apiJson<{ suggestions: SuggestedTask[] }>(
+              "/api/builder/ai/refine-preset",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ slug, presetId, brief }),
+              }
+            );
+            return { ok: true, suggestions: data.suggestions };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "AI refine failed." };
+          }
+        },
+
+        applyRefinedPreset: async (slug, presetId, tasks) => {
+          try {
+            const data = await apiJson<{ tasks: ProjectTask[]; removed: number }>(
+              "/api/builder/tasks/refine",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ slug, presetId, tasks }),
+              }
+            );
+            // Refine replaces rows (delete + insert), so re-hydrate rather than
+            // splice — the whole task list may have shifted.
+            await get().hydrateTasks(slug);
+            return { ok: true, added: data.tasks.length };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "Apply failed." };
+          }
+        },
+
         hydrateMediaAssets: async (slug) => {
           try {
             const data = await apiJson<{ role: ProjectRole; assets: MediaAsset[] }>(
@@ -1333,6 +1401,22 @@ export const useDeck = create<DeckState>()(
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ slug }),
             });
+            return { ok: true, findings: data.findings };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : "AI review failed." };
+          }
+        },
+
+        reviewTimeline: async (slug) => {
+          try {
+            const data = await apiJson<{ findings: TimelineFinding[] }>(
+              "/api/builder/ai/timeline-review",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ slug }),
+              }
+            );
             return { ok: true, findings: data.findings };
           } catch (e) {
             return { ok: false, error: e instanceof Error ? e.message : "AI review failed." };

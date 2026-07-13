@@ -342,3 +342,63 @@ existing page.
 - [x] ~~K2: Media Library UI — browse company library modal~~
 - [x] ~~K3: Show & Decor Builder UI — browse company library modal~~
 - [x] ~~K4: verified locally (real browse+copy for both media and acts, fresh independent ids confirmed via DB, viewer-role 403 confirmed both UI-hidden and via direct-fetch bypass, test data cleaned up) — code review found & fixed the guest cross-project library-browsing gap above~~
+
+## Phase M — Timeline document + AI upgrades (docx, AI review, per-task docs, preset refine)
+
+Four Timeline/documents enhancements, each built on an existing pattern rather
+than a new subsystem. Built and verified locally; **not yet deployed** (no push,
+no production D1 migration — that's a separate step when ready).
+
+- **M1 — .docx document support.** `src/lib/docx.ts` mirrors `pdf.ts`'s
+  `extractPdfText`: client-side extraction via `mammoth.extractRawText`, since
+  MiniMax can't read Word files directly — the browser pulls the text and sends
+  that. `DocumentKind` gained `"docx"`; the upload route maps the Office MIME to
+  a clean `"docx"` extension (the naïve `type.split("/")[1]` would have produced
+  a garbled string); `AddDocumentModal` got a docx branch alongside pdf, and the
+  doc chips show a 📃 icon.
+- **M2 — AI Timeline review.** A near-exact clone of the run-of-show
+  `/api/builder/ai/review` flow, reading the prep-task list instead of the
+  program: `/api/builder/ai/timeline-review` route, `reviewTimeline` store
+  action, and `TimelineReviewModal` (cloned from `RunOfShowReviewModal`) surfaced
+  by an "✨ AI Review" button. `TimelineFinding`/`FindingSeverity` are their own
+  types in `tasks.ts` (per-domain self-containment, same as the run-of-show
+  side), not shared imports.
+- **M3 — per-task document attachment.** Migration `0014_task_documents.sql` — a
+  pure many-to-many join (both sides `ON DELETE CASCADE`, gate-tested for cascade
+  in both directions against real D1). `listTasks` aggregates attached ids via a
+  correlated `GROUP_CONCAT` subquery; `setTaskDocuments` is replace-all
+  (delete-then-insert loop, sequential awaits — the project's `MinimalD1Database`
+  exposes no `.batch()`). `TaskFormModal` got an "Attached documents" checkbox
+  list. **Code review found & fixed** a cross-project/tenant-isolation gap:
+  `setTaskDocuments` originally trusted client-supplied ids without scoping — it
+  now filters against `project_documents WHERE project_id = ?` and de-dupes
+  before insert (a duplicate id would otherwise 500 mid-loop on the PK).
+- **M4 — regenerate/refine a preset from a brief.** Migration
+  `0015_task_preset_id.sql` adds a nullable `project_tasks.preset_id`, set by
+  `createTasksBulk` (optional trailing param, non-breaking for the wizard call
+  site) so preset-imported tasks are tagged with their `eventPresets` id. New
+  query fns `listImportedPresets` / `listPresetTasks` / `deleteTasksByIds`.
+  `/api/builder/ai/refine-preset` proposes a full replacement list from the
+  current tasks + a free-text brief (salvage-parse idiom, reused from the
+  suggest route); `/api/builder/tasks/refine` commits it by capturing the old
+  ids, inserting the new set under the same `preset_id`, THEN deleting the old
+  ids — ordered so a mid-insert failure can't wipe the old set (no D1
+  transaction available). UI: a gated "✨ Refine a preset" button (hidden until
+  a preset is imported) → `RefinePresetModal` (compose → propose) → the existing
+  `SuggestionsModal`, generalized with optional copy props, for the accept step.
+  Refined tasks carry a due date but no start date (they reuse the
+  `SuggestedTask` shape); the Gantt already anchors such tasks on due date.
+- **Verification.** All four exercised end-to-end against real local D1 through
+  the authenticated dev server (M4's refine hit real MiniMax): import tagged 10
+  tasks, refine honored the brief and replaced 10→11 tasks with zero orphans,
+  gating shown/hidden correctly, all four coexist on the JW Gala timeline with a
+  clean console. `tsc --noEmit` clean. Code review ran inline for M4 (the
+  subagent died twice on dropped-connection API errors) — no defects; the M3
+  cross-project fix above was the one real finding across the phase. All test
+  data cleaned up.
+
+- [x] ~~M1: .docx document support (mammoth extraction, upload/UI/icon)~~
+- [x] ~~M2: AI Timeline review (timeline-review route + store + modal + button)~~
+- [x] ~~M3: per-task document attachment (0014 migration + join queries + checkbox UI; code review fixed cross-project id gap)~~
+- [x] ~~M4: regenerate/refine a preset from a brief (0015 preset_id + refine/apply routes + RefinePresetModal)~~
+- [x] ~~M5: verified all four locally end-to-end, inline code review, PLAN.md updated, committed locally (not pushed/deployed)~~
