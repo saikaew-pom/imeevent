@@ -51,6 +51,7 @@ export function FlowExportSheet({
     return (
       <div
         key={b.id}
+        data-export-block
         className="flex gap-3.5 px-4 py-3.5 border-b hairline"
       >
         <div className="w-[90px] shrink-0">
@@ -84,7 +85,7 @@ export function FlowExportSheet({
 
   return (
     <div className="w-[820px] px-7 py-7" style={{ background: "var(--bg)", color: "var(--text)" }}>
-      <div className="mb-4">
+      <div className="mb-4" data-export-block>
         <div className="text-[22px] font-bold">{projectName}</div>
         <div className="text-[12px] text-[var(--text-faint)] mt-0.5">
           Event Flow — run of show{headerMeta ? ` · ${headerMeta}` : ""}
@@ -92,7 +93,7 @@ export function FlowExportSheet({
       </div>
 
       {!isMultiDay && (
-        <div className="mb-5">
+        <div className="mb-5" data-export-block>
           <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-2">
             Energy across the night
           </div>
@@ -105,11 +106,17 @@ export function FlowExportSheet({
             const dayBeats = program.filter((b) => (b.day ?? 1) === day);
             return (
               <div key={day} className="mb-5">
-                <div className="text-[13px] font-semibold gold-text px-4 py-1.5">
-                  Day {day}
-                </div>
-                <div className="mb-2">
-                  <EnergyCurve points={curvePoints(dayBeats)} height={160} compact />
+                {/* Day heading + its curve are one block so a break can't
+                    orphan the heading from the curve it labels. The day
+                    wrapper itself is deliberately NOT a block — it holds a
+                    whole day of beats and would never fit on one page. */}
+                <div data-export-block>
+                  <div className="text-[13px] font-semibold gold-text px-4 py-1.5">
+                    Day {day}
+                  </div>
+                  <div className="mb-2">
+                    <EnergyCurve points={curvePoints(dayBeats)} height={160} compact />
+                  </div>
                 </div>
                 <div className="rounded-[8px] border hairline">
                   {dayBeats.map(beatCard)}
