@@ -9,6 +9,7 @@ import { histGroupSubtotal, histSummary } from "@/data/history";
 import { Waterfall } from "@/components/Waterfall";
 import { HoverCard, InfoDot } from "@/components/HoverCard";
 import { ExportSaveButtons } from "@/components/ExportSaveButtons";
+import { MoneyInput } from "@/components/MoneyInput";
 import { money, moneyShort, thbShort, pct, CURRENCIES } from "@/lib/format";
 import { guestLabelFor } from "@/data/projectTemplates";
 import Link from "next/link";
@@ -142,10 +143,9 @@ export default function CostingPage() {
                   onChange={(e) => setTier(t.id, { name: e.target.value })}
                   className="text-[13px]"
                 />
-                <input
-                  type="number"
+                <MoneyInput
                   value={t.priceTHB}
-                  onChange={(e) => setTier(t.id, { priceTHB: Number(e.target.value) })}
+                  onChange={(v) => setTier(t.id, { priceTHB: v })}
                   className="text-right text-[13px]"
                 />
                 <input
@@ -249,10 +249,9 @@ export default function CostingPage() {
                       />
                       {l.note && <InfoDot text={l.note} />}
                     </span>
-                    <input
-                      type="number"
+                    <MoneyInput
                       value={l.value}
-                      onChange={(e) => setCostLine(l.id, Number(e.target.value))}
+                      onChange={(v) => setCostLine(l.id, v)}
                       className="text-right text-[12.5px]"
                     />
                     <button

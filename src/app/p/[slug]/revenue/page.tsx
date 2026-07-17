@@ -9,6 +9,7 @@ import { Waterfall } from "@/components/Waterfall";
 import { HistorySection } from "@/components/revenue/HistorySection";
 import { HoverCard } from "@/components/HoverCard";
 import { ExportSaveButtons } from "@/components/ExportSaveButtons";
+import { MoneyInput } from "@/components/MoneyInput";
 import { money, moneyShort, pct } from "@/lib/format";
 import { guestLabelFor } from "@/data/projectTemplates";
 import Link from "next/link";
@@ -119,10 +120,9 @@ export default function RevenuePage() {
                     onChange={(e) => setTier(t.id, { name: e.target.value })}
                     className="text-[12.5px]"
                   />
-                  <input
-                    type="number"
+                  <MoneyInput
                     value={t.priceTHB}
-                    onChange={(e) => setTier(t.id, { priceTHB: Number(e.target.value) })}
+                    onChange={(v) => setTier(t.id, { priceTHB: v })}
                     className="text-right text-[12.5px]"
                   />
                   <input
