@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { whySpacingWorks, Beat } from "@/data/runOfShow";
 import { VIDEO_PLACEHOLDER_POSTER } from "@/data/media";
 import { allActsList, findAct, Act, NewActInput } from "@/data/acts";
@@ -11,6 +11,8 @@ import { MediaPicker } from "@/components/media/MediaPicker";
 import { ItemFormModal } from "@/components/builder/ItemFormModal";
 import { TalentFormModal } from "@/components/timeline/TalentFormModal";
 import { RunOfShowReviewModal } from "@/components/flow/RunOfShowReviewModal";
+import { FlowExportSheet } from "@/components/flow/FlowExportSheet";
+import { ExportSaveButtons } from "@/components/ExportSaveButtons";
 import { liveBeatEnergy } from "@/lib/programEnergy";
 import { energyColor } from "@/lib/format";
 import { useDeck } from "@/store/useDeck";
@@ -32,7 +34,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useProjectSlug } from "@/components/ProjectProvider";
+import { useProject, useProjectSlug } from "@/components/ProjectProvider";
 
 const peakLabels: Record<string, string> = {
   peak1: "Peak 1",
@@ -54,6 +56,8 @@ export default function FlowPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [reviewOpen, setReviewOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+  const projectName = useProject().name;
 
   const program = useDeck((s) => s.program);
   const customActs = useDeck((s) => s.customActs);
@@ -63,6 +67,7 @@ export default function FlowPage() {
   const reorderProgram = useDeck((s) => s.reorderProgram);
   const meta = useDeck((s) => s.meta);
   const myRole = useDeck((s) => s.myRole);
+  const saveProgramNow = useDeck((s) => s.saveProgramNow);
   const canWrite = myRole === "owner" || myRole === "editor";
   const headerMeta = [meta.date, meta.timing].filter(Boolean).join(" · ");
 
@@ -166,6 +171,12 @@ export default function FlowPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <ExportSaveButtons
+            targetRef={exportRef}
+            filename={`${projectName} - Event Flow.pdf`}
+            canWrite={canWrite}
+            onSave={saveProgramNow}
+          />
           {view === "planner" && canWrite && (
             <button
               onClick={() => setReviewOpen(true)}
@@ -372,6 +383,19 @@ export default function FlowPage() {
           </div>
         </section>
       )}
+
+      {/* Off-screen PDF export target — see FlowExportSheet's own comment for
+          why this isn't just the visible planner/client view rasterized. */}
+      <div className="fixed pointer-events-none" style={{ left: -9999, top: 0 }} aria-hidden>
+        <div ref={exportRef}>
+          <FlowExportSheet
+            projectName={projectName}
+            headerMeta={headerMeta}
+            program={program}
+            customActs={customActs}
+          />
+        </div>
+      </div>
 
       {selected !== null && (
         <BeatDrawer

@@ -123,6 +123,11 @@ interface DeckState {
   resetFinancials: () => void;
   saveFinancialsNow: () => Promise<{ ok: boolean }>;
 
+  // Event Flow's program already auto-saves on the same debounce as
+  // financials/lineup; this flushes immediately so a "Save" button on that
+  // tab can confirm the write landed (mirrors saveFinancialsNow).
+  saveProgramNow: () => Promise<{ ok: boolean }>;
+
   // Custom acts / decor now live in D1, scoped per project — these are async
   // and hit the API rather than mutating local state directly.
   hydrateCustomActs: (slug: string) => Promise<void>;
@@ -519,6 +524,23 @@ export const useDeck = create<DeckState>()(
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ slug, key: "financials", data: get().financials }),
+            });
+            return { ok: res.ok };
+          } catch {
+            return { ok: false };
+          }
+        },
+
+        saveProgramNow: async () => {
+          const slug = get().projectSlug;
+          if (!slug || !isWritable(get().myRole)) return { ok: false };
+          const timer = persistTimers.program;
+          if (timer) clearTimeout(timer);
+          try {
+            const res = await fetch("/api/builder/state", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug, key: "program", data: get().program }),
             });
             return { ok: res.ok };
           } catch {

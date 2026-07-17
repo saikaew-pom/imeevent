@@ -44,6 +44,17 @@ export const thbShort = (n: number) => moneyShort(n, "THB");
 
 export const pct = (n: number) => `${n.toFixed(1)}%`;
 
+// Adds minutes to an "HH:MM" time string, wrapping past midnight — used to
+// derive a beat's end time (start + durationMin) for display, since Beat
+// only stores the start time and a duration.
+export function addMinutesToTime(time: string, minutes: number): string {
+  const [h, m] = time.split(":").map(Number);
+  const total = (((h * 60 + m + minutes) % 1440) + 1440) % 1440;
+  const hh = Math.floor(total / 60);
+  const mm = total % 60;
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
 export function energyClass(energy: number) {
   if (energy <= 3) return "energy-low";
   if (energy <= 5) return "energy-mid";
